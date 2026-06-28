@@ -9,7 +9,86 @@
     "2026-05-24T08:01:25.569Z",
     "2026-06-06T14:54:10.319Z",
     "2026-06-06T14:54:10.699Z",
-    "2026-06-06T14:54:10.898Z"
+    "2026-06-06T14:54:10.898Z",
+    "2026-06-23T23:29:10.496Z",
+    "2026-06-23T23:29:11.104Z",
+    "2026-06-23T23:29:11.260Z",
+    "2026-06-23T23:29:11.404Z",
+    "2026-06-23T23:34:19.235Z",
+    "2026-06-24T07:16:27.518Z"
   ],
-  "updatedAt": "2026-06-06T14:54:10.898Z"
+  "updatedAt": "2026-06-24T07:16:27.518Z",
+  "urges": [
+    {
+      "id": "1f71a489-4efc-460c-8524-2fbb42450385",
+      "loggedAt": "2026-06-15T15:44:00.005Z",
+      "intensity": "Medium",
+      "intensityValue": 50,
+      "context": "Bedroom",
+      "alone": true,
+      "response": "Exercise"
+    },
+    {
+      "id": "bc526729-5c92-4b93-b61b-e10318fcc228",
+      "loggedAt": "2026-06-15T15:50:42.753Z",
+      "intensity": "Max",
+      "intensityValue": 95,
+      "context": "Bathroom",
+      "alone": false,
+      "response": "Go Outside"
+    },
+    {
+      "id": "4814dcb7-03b5-4267-bb87-161aac7e9220",
+      "loggedAt": "2026-06-15T15:51:24.758Z",
+      "intensity": "Mild",
+      "intensityValue": 20,
+      "context": "Socials",
+      "alone": true,
+      "response": "Exercise"
+    },
+    {
+      "id": "0b2efb9c-fd2f-4ac7-91d5-f922d50c8717",
+      "loggedAt": "2026-06-15T15:53:55.116Z",
+      "intensity": "Medium",
+      "intensityValue": 50,
+      "context": "Bedroom",
+      "alone": true,
+      "response": "Exercise"
+    },
+    {
+      "id": "b7ba0cee-c19f-4655-8d31-df97fd5d953e",
+      "loggedAt": "2026-06-23T23:28:51.299Z",
+      "intensity": "Max",
+      "intensityValue": 95,
+      "context": "Bedroom",
+      "alone": true,
+      "response": "Cold Shower"
+    },
+    {
+      "id": "6b2a1d65-9cf5-41dd-b9a2-6e32a3a880ca",
+      "loggedAt": "2026-06-23T23:29:04.520Z",
+      "intensity": "Medium",
+      "intensityValue": 50,
+      "context": "School",
+      "alone": true,
+      "response": "Go Outside"
+    }
+  ],
+  "journalEntries": [
+    {
+      "id": "e121e790-401f-4548-bff1-66221166f372",
+      "title": "鼻子有鼻涕",
+      "body": "睡觉没盖被子，着凉了",
+      "createdAt": "2026-06-24T00:11:47.747Z"
+    },
+    {
+      "id": "7f6e3c9b-067b-4ac6-9d2a-fd316671f720",
+      "title": "测试 Journal",
+      "body": "这是一条保存验证。",
+      "createdAt": "2026-06-24T00:07:57.727Z"
+    }
+  ],
+  "reasons": [
+    "保持清醒和专注"
+  ]
 }

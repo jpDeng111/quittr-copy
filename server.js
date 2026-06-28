@@ -12,6 +12,7 @@ const QUITTR_STATE_PATH = path.join(DATA_DIR, "quittr-state.json");
 const MAX_CHUNK_SECONDS = 240;
 const CHUNKS_MANIFEST_NAME = "chunks-manifest.json";
 const MODEL_NAME = "qwen3.6-plus";
+const MELIUS_MODEL_NAME = process.env.MELIUS_MODEL || "qwen3.7-plus";
 const API_BASE_URL = String(
   process.env.DASHSCOPE_BASE_URL || "https://coding.dashscope.aliyuncs.com/v1"
 ).replace(/\/+$/, "");
@@ -48,12 +49,36 @@ const server = http.createServer(async (req, res) => {
       return await handleTranscribe(req, res);
     }
 
+    if (req.method === "POST" && url.pathname === "/api/melius/chat") {
+      return await handleMeliusChat(req, res);
+    }
+
     if (req.method === "GET" && url.pathname === "/api/quittr/analytics") {
       return sendJson(res, 200, buildQuittrAnalytics());
     }
 
     if (req.method === "POST" && url.pathname === "/api/quittr/relapses") {
       return await handleQuittrRelapse(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/quittr/urges") {
+      return await handleQuittrUrge(req, res);
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/quittr/journal") {
+      return sendJson(res, 200, { entries: getJournalEntries() });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/quittr/journal") {
+      return await handleQuittrJournalEntry(req, res);
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/quittr/reasons") {
+      return sendJson(res, 200, { reasons: getQuittrReasons() });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/quittr/reasons") {
+      return await handleQuittrReasons(req, res);
     }
 
     sendJson(res, 404, { error: "Not Found" });
@@ -65,6 +90,67 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
+
+async function handleMeliusChat(req, res) {
+  const body = await readJson(req);
+  const apiKey = String(process.env.DASHSCOPE_API_KEY || "").trim();
+  const messages = Array.isArray(body.messages) ? body.messages : [];
+  const safeMessages = messages
+    .filter((message) => message && (message.role === "user" || message.role === "assistant"))
+    .map((message) => ({
+      role: message.role,
+      content: String(message.text || message.content || "").slice(0, 3000)
+    }))
+    .filter((message) => message.content.trim())
+    .slice(-12);
+
+  if (!apiKey) {
+    return sendJson(res, 500, { error: "Missing DASHSCOPE_API_KEY in .env." });
+  }
+
+  if (safeMessages.length === 0) {
+    return sendJson(res, 400, { error: "Message is empty." });
+  }
+
+  const response = await fetch(`${API_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: MELIUS_MODEL_NAME,
+      messages: [
+        {
+          role: "system",
+          content: [
+            "You are Melius, a calm and practical nofap/reboot recovery assistant.",
+            "Help users reduce sexual urges, prevent relapse, process shame without judgment, and build healthier routines.",
+            "Use short, warm, direct responses. Ask one useful question when needed.",
+            "When the user is having an urge, prioritize grounding, delay tactics, environment change, and a concrete next 10-minute action.",
+            "Do not provide erotic content, pornographic details, or anything that intensifies arousal.",
+            "If the user mentions self-harm, coercion, abuse, or immediate danger, encourage contacting local emergency help or a trusted person right away.",
+            "Match the user's language."
+          ].join(" ")
+        },
+        ...safeMessages
+      ],
+      temperature: 0.7
+    })
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = data.message || data.code || response.statusText;
+    return sendJson(res, response.status, { error: `Melius request failed: ${detail}` });
+  }
+
+  const reply = extractTextFromDashScope(data);
+  sendJson(res, 200, {
+    model: MELIUS_MODEL_NAME,
+    reply: reply || "I am here with you. Tell me what feels strongest right now."
+  });
+}
 
 async function handleQuittrRelapse(req, res) {
   await readJson(req).catch(() => ({}));
@@ -79,6 +165,90 @@ async function handleQuittrRelapse(req, res) {
   });
 
   sendJson(res, 200, buildQuittrAnalytics());
+}
+
+async function handleQuittrUrge(req, res) {
+  const body = await readJson(req).catch(() => ({}));
+  const state = readQuittrState();
+  const loggedAt = new Date().toISOString();
+  const urges = Array.isArray(state.urges) ? state.urges : [];
+  const urge = {
+    id: crypto.randomUUID(),
+    loggedAt,
+    intensity: String(body.intensity || "Unknown"),
+    intensityValue: clampNumber(body.intensityValue, 0, 100),
+    context: String(body.context || "Unknown"),
+    alone: typeof body.alone === "boolean" ? body.alone : null,
+    response: String(body.response || "Not set")
+  };
+
+  writeQuittrState({
+    ...state,
+    urges: [...urges, urge],
+    updatedAt: loggedAt
+  });
+
+  sendJson(res, 200, { urge, analytics: buildQuittrAnalytics() });
+}
+
+async function handleQuittrJournalEntry(req, res) {
+  const body = await readJson(req).catch(() => ({}));
+  const state = readQuittrState();
+  const createdAt = new Date().toISOString();
+  const title = String(body.title || "").trim();
+  const entryBody = String(body.body || "").trim();
+
+  if (!title && !entryBody) {
+    return sendJson(res, 400, { error: "Journal entry is empty." });
+  }
+
+  const journalEntries = Array.isArray(state.journalEntries) ? state.journalEntries : [];
+  const entry = {
+    id: crypto.randomUUID(),
+    title: title || "Untitled",
+    body: entryBody,
+    createdAt
+  };
+
+  writeQuittrState({
+    ...state,
+    journalEntries: [entry, ...journalEntries],
+    updatedAt: createdAt
+  });
+
+  sendJson(res, 200, { entry, entries: getJournalEntries() });
+}
+
+function getJournalEntries() {
+  const state = readQuittrState();
+  const journalEntries = Array.isArray(state.journalEntries) ? state.journalEntries : [];
+  return journalEntries
+    .filter((entry) => entry && (entry.title || entry.body))
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+}
+
+async function handleQuittrReasons(req, res) {
+  const body = await readJson(req).catch(() => ({}));
+  const state = readQuittrState();
+  const reasons = Array.isArray(body.reasons)
+    ? body.reasons.map((reason) => String(reason || "").trim()).filter(Boolean)
+    : [];
+  const updatedAt = new Date().toISOString();
+
+  writeQuittrState({
+    ...state,
+    reasons,
+    updatedAt
+  });
+
+  sendJson(res, 200, { reasons });
+}
+
+function getQuittrReasons() {
+  const state = readQuittrState();
+  return Array.isArray(state.reasons)
+    ? state.reasons.map((reason) => String(reason || "").trim()).filter(Boolean)
+    : [];
 }
 
 function buildQuittrAnalytics(now = new Date()) {
@@ -106,9 +276,17 @@ function buildQuittrAnalytics(now = new Date()) {
   return {
     startedAt: startedAt.toISOString(),
     generatedAt: now.toISOString(),
+    currentStreakStartAt: currentStreak.startAt,
+    currentStreakMs: Math.max(0, now.getTime() - new Date(currentStreak.startAt).getTime()),
     currentStreakDays: roundDays(currentDays),
     currentStreakLabel: formatDaysLabel(currentDays),
+    currentStreakClockLabel: formatDurationLabel(Math.max(0, now.getTime() - new Date(currentStreak.startAt).getTime())),
+    soberGoalDays: 90,
+    soberGoalRemainingLabel: formatGoalRemainingLabel(currentDays, 90),
     relapses: relapses.map((date) => date.toISOString()),
+    urges: Array.isArray(state.urges) ? state.urges : [],
+    journalEntries: getJournalEntries(),
+    reasons: getQuittrReasons(),
     streaks: streaks.map((streak, index) => ({
       id: index + 1,
       startAt: streak.startAt,
@@ -275,6 +453,12 @@ function roundDays(value) {
   return Math.round(value * 10) / 10;
 }
 
+function clampNumber(value, min, max) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return min;
+  return Math.min(max, Math.max(min, number));
+}
+
 function formatDaysLabel(days) {
   const roundedDays = roundDays(days);
 
@@ -290,6 +474,33 @@ function formatCompactDays(days) {
     return `${Math.max(0, Math.round(days * 24))}h`;
   }
   return `${Math.round(days)}d`;
+}
+
+function formatDurationLabel(ms) {
+  const totalMinutes = Math.max(0, Math.floor(ms / (60 * 1000)));
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) {
+    return `${days}d ${hours}h`;
+  }
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
+
+function formatGoalRemainingLabel(currentDays, goalDays) {
+  const remainingDays = Math.max(0, goalDays - currentDays);
+  if (remainingDays === 0) {
+    return "0d";
+  }
+  if (remainingDays < 1) {
+    const remainingHours = Math.ceil(remainingDays * 24);
+    return `${remainingHours}h`;
+  }
+  return `${Math.ceil(remainingDays)}d`;
 }
 
 async function handleTranscribe(req, res) {
