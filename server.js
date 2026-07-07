@@ -2,23 +2,17 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { spawn } = require("child_process");
 
 const ROOT_DIR = __dirname;
 const STATIC_DIR = path.join(ROOT_DIR, "public");
-const JOBS_ROOT = path.join(ROOT_DIR, "jobs");
 const DATA_DIR = path.join(ROOT_DIR, "data");
 const QUITTR_STATE_PATH = path.join(DATA_DIR, "quittr-state.json");
-const MAX_CHUNK_SECONDS = 240;
-const CHUNKS_MANIFEST_NAME = "chunks-manifest.json";
-const MODEL_NAME = "qwen3.6-plus";
 const MELIUS_MODEL_NAME = process.env.MELIUS_MODEL || "qwen3.7-plus";
 const API_BASE_URL = String(
   process.env.DASHSCOPE_BASE_URL || "https://coding.dashscope.aliyuncs.com/v1"
 ).replace(/\/+$/, "");
 
 loadEnvFile(path.join(ROOT_DIR, ".env"));
-fs.mkdirSync(JOBS_ROOT, { recursive: true });
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const PORT = Number(process.env.PORT || 3000);
 
@@ -43,10 +37,6 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && url.pathname === "/styles.css") {
       return serveFile(res, path.join(STATIC_DIR, "styles.css"), "text/css; charset=utf-8");
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/transcribe") {
-      return await handleTranscribe(req, res);
     }
 
     if (req.method === "POST" && url.pathname === "/api/melius/chat") {
@@ -79,6 +69,78 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/api/quittr/reasons") {
       return await handleQuittrReasons(req, res);
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/blocker/state") {
+      return sendJson(res, 200, getBlockerState());
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/blocker/protection") {
+      return await handleBlockerProtection(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/blocker/tier1") {
+      return await handleBlockerTier1(req, res);
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/blocker/websites") {
+      return sendJson(res, 200, { websites: getBlockerWebsites() });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/blocker/websites") {
+      return await handleBlockerAddWebsite(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/blocker/websites/remove") {
+      return await handleBlockerRemoveWebsite(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/blocker/tier2") {
+      return await handleBlockerTier2(req, res);
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/blocker/apps") {
+      return sendJson(res, 200, { apps: getBlockerApps() });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/blocker/apps") {
+      return await handleBlockerAddApp(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/blocker/apps/remove") {
+      return await handleBlockerRemoveApp(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/blocker/tier3") {
+      return await handleBlockerTier3(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/blocker/tier3/unlock") {
+      return await handleBlockerTier3Unlock(req, res);
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/blocker/screentime") {
+      return sendJson(res, 200, getBlockerScreenTime());
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/community/posts") {
+      return sendJson(res, 200, getCommunityPosts(url.searchParams.get("filter")));
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/community/posts") {
+      return await handleCommunityCreatePost(req, res);
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/community/post") {
+      return sendJson(res, 200, getCommunityPost(url.searchParams.get("id")));
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/community/comment") {
+      return await handleCommunityComment(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/community/like") {
+      return await handleCommunityLike(req, res);
     }
 
     sendJson(res, 404, { error: "Not Found" });
@@ -503,520 +565,6 @@ function formatGoalRemainingLabel(currentDays, goalDays) {
   return `${Math.ceil(remainingDays)}d`;
 }
 
-async function handleTranscribe(req, res) {
-  let job = null;
-
-  try {
-    const body = await readJson(req);
-    const videoUrl = String(body.url || "").trim();
-    const apiKey = String(process.env.DASHSCOPE_API_KEY || "").trim();
-
-    if (!videoUrl) {
-      return sendJson(res, 400, { error: "Please provide a video URL." });
-    }
-
-    if (!apiKey) {
-      return sendJson(res, 500, { error: "Missing DASHSCOPE_API_KEY in .env." });
-    }
-
-    assertRequiredCommands(["yt-dlp", "ffmpeg", "ffprobe"]);
-
-    job = createJob(videoUrl);
-    fs.mkdirSync(job.dir, { recursive: true });
-    fs.mkdirSync(job.chunksDir, { recursive: true });
-    fs.mkdirSync(job.resultsDir, { recursive: true });
-
-    res.writeHead(200, {
-      "Content-Type": "application/x-ndjson; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive"
-    });
-
-    const sendEvent = (payload) => {
-      if (res.writableEnded || res.destroyed) {
-        return;
-      }
-
-      try {
-        res.write(`${JSON.stringify(payload)}\n`);
-      } catch {
-        // Keep the background job moving even if the browser connection closes.
-      }
-    };
-
-    sendEvent({
-      type: "status",
-      step: "prepare",
-      message: `Preparing resumable job ${job.id}...`
-    });
-    updateCheckpoint(job, {
-      id: job.id,
-      sourceUrl: videoUrl,
-      model: MODEL_NAME,
-      chunkSeconds: MAX_CHUNK_SECONDS,
-      status: "preparing"
-    });
-
-    const existingTranscript = readTextFile(job.transcriptPath);
-    if (existingTranscript) {
-      sendEvent({
-        type: "partial",
-        transcript: existingTranscript,
-        transcriptPath: job.transcriptPath
-      });
-    }
-
-    const info = await downloadVideo(videoUrl, job, sendEvent);
-    sendEvent({
-      type: "status",
-      step: "downloaded",
-      message: `Downloaded video for: ${info.title}`
-    });
-
-    const metadata = {
-      id: job.id,
-      sourceUrl: videoUrl,
-      title: info.title,
-      model: MODEL_NAME,
-      chunkSeconds: MAX_CHUNK_SECONDS,
-      updatedAt: new Date().toISOString(),
-      transcriptPath: job.transcriptPath
-    };
-    writeJsonFile(job.metadataPath, metadata);
-    updateCheckpoint(job, {
-      ...metadata,
-      status: "downloaded",
-      sourcePath: info.sourcePath || "",
-      normalizedPath: info.videoPath
-    });
-
-    const chunks = await splitVideo(info.videoPath, job, sendEvent);
-    sendEvent({
-      type: "status",
-      step: "chunks_ready",
-      message: `Prepared ${chunks.length} video chunk(s).`
-    });
-    updateCheckpoint(job, {
-      id: job.id,
-      sourceUrl: videoUrl,
-      title: info.title,
-      model: MODEL_NAME,
-      totalChunks: chunks.length,
-      completedChunks: countCompletedChunks(job, chunks.length),
-      lastCompletedChunk: getLastCompletedChunk(job, chunks.length),
-      status: "chunks_ready",
-      transcriptPath: job.transcriptPath
-    });
-
-    for (let index = 0; index < chunks.length; index += 1) {
-      const chunkPath = chunks[index];
-      const resultPath = getChunkResultPath(job, index);
-      const existingChunkText = readTextFile(resultPath);
-
-      if (existingChunkText) {
-        const transcript = rebuildTranscript(job, chunks.length);
-        updateCheckpoint(job, {
-          id: job.id,
-          sourceUrl: videoUrl,
-          title: info.title,
-          model: MODEL_NAME,
-          totalChunks: chunks.length,
-          completedChunks: countCompletedChunks(job, chunks.length),
-          lastCompletedChunk: getLastCompletedChunk(job, chunks.length),
-          status: countCompletedChunks(job, chunks.length) === chunks.length ? "complete" : "transcribing",
-          transcriptPath: job.transcriptPath
-        });
-        sendEvent({
-          type: "partial",
-          transcript,
-          transcriptPath: job.transcriptPath
-        });
-        sendEvent({
-          type: "status",
-          step: "resume",
-          message: `Skipping completed chunk ${index + 1}/${chunks.length}.`,
-          progress: Math.round(((index + 1) / chunks.length) * 100)
-        });
-        continue;
-      }
-
-      sendEvent({
-        type: "status",
-        step: "transcribing",
-        message: `Analyzing video chunk ${index + 1}/${chunks.length}...`,
-        progress: Math.round((index / chunks.length) * 100)
-      });
-      updateCheckpoint(job, {
-        id: job.id,
-        sourceUrl: videoUrl,
-        title: info.title,
-        model: MODEL_NAME,
-        totalChunks: chunks.length,
-        completedChunks: countCompletedChunks(job, chunks.length),
-        lastCompletedChunk: getLastCompletedChunk(job, chunks.length),
-        currentChunk: index,
-        status: "transcribing",
-        transcriptPath: job.transcriptPath
-      });
-      const piece = await transcribeChunk({
-        apiKey,
-        videoPath: chunkPath
-      });
-
-      writeTextFileAtomic(resultPath, piece.trim() ? `${piece.trim()}\n` : "");
-      const transcript = rebuildTranscript(job, chunks.length);
-      updateCheckpoint(job, {
-        id: job.id,
-        sourceUrl: videoUrl,
-        title: info.title,
-        model: MODEL_NAME,
-        totalChunks: chunks.length,
-        lastCompletedChunk: index,
-        completedChunks: countCompletedChunks(job, chunks.length),
-        currentChunk: null,
-        status: countCompletedChunks(job, chunks.length) === chunks.length ? "complete" : "transcribing",
-        transcriptPath: job.transcriptPath
-      });
-
-      sendEvent({
-        type: "partial",
-        transcript,
-        transcriptPath: job.transcriptPath
-      });
-      sendEvent({
-        type: "status",
-        step: "saved",
-        message: `Saved chunk ${index + 1}/${chunks.length} to transcript.txt.`,
-        progress: Math.round(((index + 1) / chunks.length) * 100)
-      });
-    }
-
-    const finalText = readTextFile(job.transcriptPath).trim();
-    updateCheckpoint(job, {
-      id: job.id,
-      sourceUrl: videoUrl,
-      title: info.title,
-      model: MODEL_NAME,
-      totalChunks: chunks.length,
-      completedChunks: chunks.length,
-      lastCompletedChunk: chunks.length - 1,
-      currentChunk: null,
-      status: "complete",
-      completedAt: new Date().toISOString(),
-      transcriptPath: job.transcriptPath
-    });
-    sendEvent({
-      type: "done",
-      title: info.title,
-      sourceUrl: videoUrl,
-      transcript: finalText,
-      transcriptPath: job.transcriptPath,
-      progress: 100
-    });
-    res.end();
-  } catch (error) {
-    const message = getErrorMessage(error);
-
-    if (job?.checkpointPath) {
-      const checkpoint = readJsonFile(job.checkpointPath);
-      updateCheckpoint(job, {
-        ...checkpoint,
-        id: job.id,
-        status: "failed",
-        failedAt: new Date().toISOString(),
-        error: message,
-        transcriptPath: job.transcriptPath
-      });
-    }
-
-    if (!res.headersSent) {
-      return sendJson(res, 500, { error: message });
-    }
-
-    if (!res.writableEnded && !res.destroyed) {
-      res.write(`${JSON.stringify({ type: "error", error: message })}\n`);
-    }
-    res.end();
-  }
-}
-
-async function downloadVideo(videoUrl, job, sendEvent) {
-  const existingMetadata = readJsonFile(job.metadataPath);
-  let existingSourcePath = findFirstFile(job.dir, /^source\.(mp4|mkv|webm|mov|m4v)$/i);
-
-  if (fs.existsSync(job.normalizedPath) && await isValidMediaFile(job.normalizedPath)) {
-    sendEvent({
-      type: "status",
-      step: "resume",
-      message: "Found existing normalized video, skipping download."
-    });
-    return {
-      title: existingMetadata.title || await fetchVideoTitle(videoUrl),
-      sourcePath: existingSourcePath,
-      videoPath: job.normalizedPath
-    };
-  }
-
-  if (fs.existsSync(job.normalizedPath)) {
-    sendEvent({
-      type: "status",
-      step: "resume",
-      message: "Found incomplete normalized video, rebuilding it."
-    });
-    removeFileIfExists(job.normalizedPath);
-  }
-
-  if (existingSourcePath && !await isValidMediaFile(existingSourcePath)) {
-    sendEvent({
-      type: "status",
-      step: "resume",
-      message: "Found incomplete source video, downloading it again."
-    });
-    removeFileIfExists(existingSourcePath);
-    existingSourcePath = "";
-  }
-
-  let sourcePath = existingSourcePath;
-  const outputTemplate = path.join(job.dir, "source.%(ext)s");
-
-  if (!sourcePath) {
-    sendEvent({
-      type: "status",
-      step: "download",
-      message: "Downloading video with yt-dlp..."
-    });
-
-    await runCommand("yt-dlp", [
-      "--no-playlist",
-      "--merge-output-format",
-      "mp4",
-      "--output",
-      outputTemplate,
-      videoUrl
-    ], {
-      cwd: job.dir
-    });
-
-    sourcePath = findFirstFile(job.dir, /^source\.(mp4|mkv|webm|mov|m4v)$/i);
-    if (sourcePath && !await isValidMediaFile(sourcePath)) {
-      removeFileIfExists(sourcePath);
-      sourcePath = "";
-    }
-  } else {
-    sendEvent({
-      type: "status",
-      step: "resume",
-      message: "Found existing source video, skipping download."
-    });
-  }
-
-  if (!sourcePath) {
-    throw new Error("Could not find downloaded video file.");
-  }
-
-  sendEvent({
-    type: "status",
-    step: "normalize",
-    message: "Normalizing video with ffmpeg..."
-  });
-
-  const normalizedTmpPath = path.join(job.dir, `normalized.tmp-${process.pid}-${Date.now()}.mp4`);
-  removeFileIfExists(normalizedTmpPath);
-  await runCommand("ffmpeg", [
-    "-y",
-    "-i",
-    sourcePath,
-    "-vf",
-    "scale='min(1280,iw)':-2",
-    "-c:v",
-    "libx264",
-    "-preset",
-    "veryfast",
-    "-crf",
-    "30",
-    "-c:a",
-    "aac",
-    "-b:a",
-    "96k",
-    "-movflags",
-    "+faststart",
-    normalizedTmpPath
-  ], {
-    cwd: job.dir
-  });
-
-  if (!await isValidMediaFile(normalizedTmpPath)) {
-    removeFileIfExists(normalizedTmpPath);
-    throw new Error("Video normalization completed but the output file is not readable.");
-  }
-
-  fs.renameSync(normalizedTmpPath, job.normalizedPath);
-  const title = existingMetadata.title || await fetchVideoTitle(videoUrl);
-  return {
-    title,
-    sourcePath,
-    videoPath: job.normalizedPath
-  };
-}
-
-async function splitVideo(videoPath, job, sendEvent) {
-  const durationSeconds = await getMediaDuration(videoPath);
-  if (durationSeconds <= MAX_CHUNK_SECONDS) {
-    writeChunksManifest(job, {
-      totalChunks: 1,
-      chunkSeconds: MAX_CHUNK_SECONDS,
-      durationSeconds,
-      chunks: [path.basename(videoPath)],
-      singleFile: true
-    });
-    return [videoPath];
-  }
-
-  const reusableChunks = await getReusableChunks(job, durationSeconds);
-  if (reusableChunks.length > 0) {
-    sendEvent({
-      type: "status",
-      step: "resume",
-      message: `Found ${reusableChunks.length} complete video chunk(s), skipping split.`
-    });
-    return reusableChunks;
-  }
-
-  if (getExistingChunks(job).length > 0) {
-    sendEvent({
-      type: "status",
-      step: "resume",
-      message: "Found incomplete video chunks, rebuilding the chunk set."
-    });
-  }
-
-  sendEvent({
-    type: "status",
-    step: "split",
-    message: `Video is ${Math.ceil(durationSeconds)}s long, splitting into ${MAX_CHUNK_SECONDS}s chunks...`
-  });
-
-  updateCheckpoint(job, {
-    status: "splitting",
-    durationSeconds,
-    expectedChunks: Math.ceil(durationSeconds / MAX_CHUNK_SECONDS),
-    chunkSeconds: MAX_CHUNK_SECONDS
-  });
-
-  const tempChunksDir = path.join(job.dir, `chunks.tmp-${process.pid}-${Date.now()}`);
-  fs.mkdirSync(tempChunksDir, { recursive: true });
-
-  try {
-    const chunkPattern = path.join(tempChunksDir, "chunk-%03d.mp4");
-    await runCommand("ffmpeg", [
-      "-y",
-      "-i",
-      videoPath,
-      "-f",
-      "segment",
-      "-segment_time",
-      String(MAX_CHUNK_SECONDS),
-      "-reset_timestamps",
-      "1",
-      "-c:v",
-      "libx264",
-      "-preset",
-      "veryfast",
-      "-crf",
-      "30",
-      "-c:a",
-      "aac",
-      "-b:a",
-      "96k",
-      chunkPattern
-    ], {
-      cwd: job.dir
-    });
-
-    const chunkFiles = listChunkFiles(tempChunksDir);
-
-    if (chunkFiles.length === 0) {
-      throw new Error("Video splitting completed but no chunk files were produced.");
-    }
-
-    for (const chunkFile of chunkFiles) {
-      if (!await isValidMediaFile(chunkFile)) {
-        throw new Error(`Video splitting produced an unreadable chunk: ${path.basename(chunkFile)}`);
-      }
-    }
-
-    cleanChunkFiles(job);
-    fs.mkdirSync(job.chunksDir, { recursive: true });
-    for (const chunkFile of chunkFiles) {
-      fs.renameSync(chunkFile, path.join(job.chunksDir, path.basename(chunkFile)));
-    }
-
-    const finalChunks = getExistingChunks(job);
-    writeChunksManifest(job, {
-      totalChunks: finalChunks.length,
-      chunkSeconds: MAX_CHUNK_SECONDS,
-      durationSeconds,
-      chunks: finalChunks.map((chunkPath) => path.basename(chunkPath)),
-      singleFile: false
-    });
-
-    return finalChunks;
-  } finally {
-    fs.rmSync(tempChunksDir, { recursive: true, force: true });
-  }
-}
-
-async function transcribeChunk({ apiKey, videoPath }) {
-  const videoBase64 = fs.readFileSync(videoPath).toString("base64");
-  const body = {
-    model: MODEL_NAME,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "video_url",
-            video_url: {
-              url: `data:video/mp4;base64,${videoBase64}`
-            },
-            fps: 2
-          },
-          {
-            type: "text",
-            text: [
-              "请尽量提取这段视频中的口播、对白、旁白与字幕内容，整理为连续文字。",
-              "如果有明显听不清或模型无法确认的部分，请用[不清晰]标记。",
-              "不要做摘要，优先输出尽可能完整的逐段文字内容。"
-            ].join("")
-          }
-        ]
-      }
-    ]
-  };
-
-  const response = await fetch(`${API_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const detail = data.message || data.code || response.statusText;
-    throw new Error(`DashScope request failed: ${detail}`);
-  }
-
-  const text = extractTextFromDashScope(data);
-  if (!text) {
-    throw new Error("DashScope returned no transcript text.");
-  }
-
-  return text;
-}
-
 function extractTextFromDashScope(data) {
   const candidates = [];
 
@@ -1044,128 +592,6 @@ function extractTextFromDashScope(data) {
   return candidates.map((item) => item.trim()).find(Boolean) || "";
 }
 
-function createJob(videoUrl) {
-  const id = crypto.createHash("sha256").update(videoUrl).digest("hex").slice(0, 16);
-  const dir = path.join(JOBS_ROOT, id);
-  return {
-    id,
-    dir,
-    chunksDir: path.join(dir, "chunks"),
-    resultsDir: path.join(dir, "results"),
-    chunksManifestPath: path.join(dir, CHUNKS_MANIFEST_NAME),
-    metadataPath: path.join(dir, "metadata.json"),
-    checkpointPath: path.join(dir, "checkpoint.json"),
-    normalizedPath: path.join(dir, "normalized.mp4"),
-    transcriptPath: path.join(dir, "transcript.txt")
-  };
-}
-
-function getExistingChunks(job) {
-  return listChunkFiles(job.chunksDir);
-}
-
-function listChunkFiles(directory) {
-  if (!fs.existsSync(directory)) {
-    return [];
-  }
-
-  return fs.readdirSync(directory)
-    .filter((name) => /^chunk-\d{3}\.mp4$/i.test(name))
-    .sort()
-    .map((name) => path.join(directory, name));
-}
-
-async function getReusableChunks(job, durationSeconds) {
-  const manifest = readJsonFile(job.chunksManifestPath);
-  const manifestDuration = Number(manifest.durationSeconds);
-  if (
-    manifest.chunkSeconds !== MAX_CHUNK_SECONDS ||
-    !Number.isFinite(manifestDuration) ||
-    Math.abs(manifestDuration - durationSeconds) > 1 ||
-    !Array.isArray(manifest.chunks) ||
-    manifest.chunks.length === 0 ||
-    manifest.totalChunks !== manifest.chunks.length
-  ) {
-    return [];
-  }
-
-  const chunks = manifest.chunks.map((name) => path.join(job.chunksDir, path.basename(name)));
-  if (chunks.some((chunkPath) => !fs.existsSync(chunkPath))) {
-    return [];
-  }
-
-  for (const chunkPath of chunks) {
-    if (!await isValidMediaFile(chunkPath)) {
-      return [];
-    }
-  }
-
-  return chunks;
-}
-
-function writeChunksManifest(job, payload) {
-  writeJsonFile(job.chunksManifestPath, {
-    ...payload,
-    updatedAt: new Date().toISOString()
-  });
-}
-
-function cleanChunkFiles(job) {
-  fs.mkdirSync(job.chunksDir, { recursive: true });
-  for (const chunkPath of getExistingChunks(job)) {
-    removeFileIfExists(chunkPath);
-  }
-  removeFileIfExists(job.chunksManifestPath);
-}
-
-function getChunkResultPath(job, index) {
-  return path.join(job.resultsDir, `chunk-${String(index).padStart(3, "0")}.txt`);
-}
-
-function rebuildTranscript(job, totalChunks) {
-  const parts = [];
-
-  for (let index = 0; index < totalChunks; index += 1) {
-    const text = readTextFile(getChunkResultPath(job, index)).trim();
-    if (!text) {
-      continue;
-    }
-
-    parts.push(`## Chunk ${index + 1}\n\n${text}`);
-  }
-
-  const transcript = parts.join("\n\n").trim();
-  writeTextFileAtomic(job.transcriptPath, transcript ? `${transcript}\n` : "");
-  return transcript;
-}
-
-function countCompletedChunks(job, totalChunks) {
-  let count = 0;
-  for (let index = 0; index < totalChunks; index += 1) {
-    if (readTextFile(getChunkResultPath(job, index)).trim()) {
-      count += 1;
-    }
-  }
-  return count;
-}
-
-function getLastCompletedChunk(job, totalChunks) {
-  for (let index = totalChunks - 1; index >= 0; index -= 1) {
-    if (readTextFile(getChunkResultPath(job, index)).trim()) {
-      return index;
-    }
-  }
-  return null;
-}
-
-function readTextFile(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return "";
-  }
-
-  return fs.readFileSync(filePath, "utf8");
-}
-
 function readJsonFile(filePath) {
   if (!fs.existsSync(filePath)) {
     return {};
@@ -1182,130 +608,11 @@ function writeJsonFile(filePath, payload) {
   writeTextFileAtomic(filePath, `${JSON.stringify(payload, null, 2)}\n`);
 }
 
-function updateCheckpoint(job, patch) {
-  const current = readJsonFile(job.checkpointPath);
-  writeJsonFile(job.checkpointPath, {
-    ...current,
-    ...patch,
-    updatedAt: new Date().toISOString()
-  });
-}
-
 function writeTextFileAtomic(filePath, text) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
   fs.writeFileSync(tmpPath, text, "utf8");
   fs.renameSync(tmpPath, filePath);
-}
-
-function removeFileIfExists(filePath) {
-  fs.rmSync(filePath, { force: true });
-}
-
-async function isValidMediaFile(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return false;
-  }
-
-  try {
-    const duration = await getMediaDuration(filePath);
-    return Number.isFinite(duration) && duration > 0;
-  } catch {
-    return false;
-  }
-}
-
-async function fetchVideoTitle(videoUrl) {
-  try {
-    const output = await runCommand("yt-dlp", [
-      "--print",
-      "%(title)s",
-      "--no-playlist",
-      videoUrl
-    ]);
-    return output.trim() || "Untitled Video";
-  } catch {
-    return "Untitled Video";
-  }
-}
-
-async function getMediaDuration(mediaPath) {
-  const output = await runCommand("ffprobe", [
-    "-v",
-    "error",
-    "-show_entries",
-    "format=duration",
-    "-of",
-    "default=noprint_wrappers=1:nokey=1",
-    mediaPath
-  ]);
-
-  const duration = Number(output.trim());
-  if (!Number.isFinite(duration)) {
-    throw new Error("Could not determine media duration.");
-  }
-
-  return duration;
-}
-
-function assertRequiredCommands(commands) {
-  for (const command of commands) {
-    if (!findCommandInPath(command)) {
-      throw new Error(`Missing required command: ${command}. Please install it first.`);
-    }
-  }
-}
-
-function findCommandInPath(command) {
-  const pathValue = process.env.PATH || "";
-  for (const directory of pathValue.split(path.delimiter)) {
-    const fullPath = path.join(directory, command);
-    if (fs.existsSync(fullPath)) {
-      return fullPath;
-    }
-  }
-  return "";
-}
-
-function runCommand(command, args, options = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd || ROOT_DIR,
-      env: process.env,
-      stdio: ["ignore", "pipe", "pipe"]
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk.toString();
-    });
-
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    child.on("error", (error) => {
-      reject(new Error(`${command} failed to start: ${error.message}`));
-    });
-
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve(stdout);
-        return;
-      }
-
-      const message = stderr.trim() || stdout.trim() || `${command} exited with code ${code}`;
-      reject(new Error(message));
-    });
-  });
-}
-
-function findFirstFile(directory, pattern) {
-  const names = fs.readdirSync(directory);
-  const match = names.find((name) => pattern.test(name));
-  return match ? path.join(directory, match) : "";
 }
 
 function sendJson(res, statusCode, payload) {
@@ -1373,4 +680,475 @@ function loadEnvFile(filePath) {
 
 function getErrorMessage(error) {
   return error instanceof Error ? error.message : String(error);
+}
+
+const DEFAULT_ADULT_DOMAINS = [
+  "pornhub.com", "xvideos.com", "xnxx.com", "xhamster.com", "redtube.com",
+  "youporn.com", "tube8.com", "spankbang.com", "brazzers.com", "onlyfans.com",
+  "chaturbate.com", "stripchat.com", "cam4.com", "livejasmin.com", "bongacams.com",
+  "eporner.com", "tnaflix.com", "beeg.com", "daftsex.com", "xmoviesforyou.com"
+];
+
+const AVAILABLE_APPS = [
+  { id: "safari", name: "Safari", category: "Browser" },
+  { id: "chrome", name: "Chrome", category: "Browser" },
+  { id: "youtube", name: "YouTube", category: "Entertainment" },
+  { id: "instagram", name: "Instagram", category: "Social" },
+  { id: "tiktok", name: "TikTok", category: "Social" },
+  { id: "x", name: "X (Twitter)", category: "Social" },
+  { id: "reddit", name: "Reddit", category: "Social" },
+  { id: "snapchat", name: "Snapchat", category: "Social" },
+  { id: "facebook", name: "Facebook", category: "Social" },
+  { id: "twitch", name: "Twitch", category: "Entertainment" },
+  { id: "netflix", name: "Netflix", category: "Entertainment" },
+  { id: "discord", name: "Discord", category: "Communication" },
+  { id: "telegram", name: "Telegram", category: "Communication" },
+  { id: "whatsapp", name: "WhatsApp", category: "Communication" }
+];
+
+function createDefaultBlockerState(now = new Date()) {
+  return {
+    protectionEnabled: false,
+    tier1: {
+      enabled: false,
+      presetDomains: DEFAULT_ADULT_DOMAINS.slice(),
+      customWebsites: []
+    },
+    tier2: {
+      enabled: false,
+      screenTimeIntegration: false,
+      apps: []
+    },
+    tier3: {
+      enabled: false,
+      lockedAt: null,
+      passcodeHash: null
+    },
+    screenTime: {
+      todayMinutes: 0,
+      pickups: 0,
+      updatedAt: now.toISOString()
+    },
+    updatedAt: now.toISOString()
+  };
+}
+
+function getBlockerState() {
+  const state = readQuittrState();
+  if (!state.blocker || !state.blocker.tier1) {
+    const blocker = createDefaultBlockerState();
+    writeQuittrState({ ...state, blocker, updatedAt: new Date().toISOString() });
+    return blocker;
+  }
+  return state.blocker;
+}
+
+function writeBlockerState(blocker) {
+  const state = readQuittrState();
+  const updatedAt = new Date().toISOString();
+  blocker.updatedAt = updatedAt;
+  writeQuittrState({ ...state, blocker, updatedAt });
+  return blocker;
+}
+
+function getBlockerWebsites() {
+  const blocker = getBlockerState();
+  const preset = (blocker.tier1.presetDomains || []).map((domain) => ({ domain, preset: true }));
+  const custom = (blocker.tier1.customWebsites || []).map((domain) => ({ domain, preset: false }));
+  return [...preset, ...custom];
+}
+
+function getBlockerApps() {
+  const blocker = getBlockerState();
+  return blocker.tier2.apps || [];
+}
+
+function getBlockerScreenTime() {
+  const blocker = getBlockerState();
+  return blocker.screenTime || { todayMinutes: 0, pickups: 0 };
+}
+
+function normalizeDomain(input) {
+  return String(input || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/\/.+$/, "");
+}
+
+function hashPasscode(passcode) {
+  return crypto.createHash("sha256").update(String(passcode || "")).digest("hex");
+}
+
+async function handleBlockerProtection(req, res) {
+  const body = await readJson(req).catch(() => ({}));
+  const blocker = getBlockerState();
+  const enabled = Boolean(body.enabled);
+  blocker.protectionEnabled = enabled;
+  if (enabled && !blocker.tier1.enabled) {
+    blocker.tier1.enabled = true;
+  }
+  if (!enabled) {
+    if (blocker.tier3.enabled) {
+      return sendJson(res, 403, { error: "Permanent lock is active. Protection cannot be turned off." });
+    }
+    blocker.tier1.enabled = false;
+    blocker.tier2.enabled = false;
+  }
+  const updated = writeBlockerState(blocker);
+  sendJson(res, 200, updated);
+}
+
+async function handleBlockerTier1(req, res) {
+  const body = await readJson(req).catch(() => ({}));
+  const blocker = getBlockerState();
+  blocker.tier1.enabled = Boolean(body.enabled);
+  if (blocker.tier1.enabled) {
+    blocker.protectionEnabled = true;
+  } else if (!blocker.tier2.enabled) {
+    blocker.protectionEnabled = false;
+  }
+  const updated = writeBlockerState(blocker);
+  sendJson(res, 200, updated);
+}
+
+async function handleBlockerAddWebsite(req, res) {
+  const body = await readJson(req).catch(() => ({}));
+  const domain = normalizeDomain(body.website || body.domain);
+  if (!domain || !domain.includes(".")) {
+    return sendJson(res, 400, { error: "Please enter a valid website domain." });
+  }
+  const blocker = getBlockerState();
+  const presetDomains = blocker.tier1.presetDomains || [];
+  const customWebsites = blocker.tier1.customWebsites || [];
+  if (presetDomains.includes(domain) || customWebsites.includes(domain)) {
+    return sendJson(res, 409, { error: "This website is already blocked." });
+  }
+  customWebsites.push(domain);
+  blocker.tier1.customWebsites = customWebsites;
+  const updated = writeBlockerState(blocker);
+  sendJson(res, 200, { websites: getBlockerWebsites(), blocker: updated });
+}
+
+async function handleBlockerRemoveWebsite(req, res) {
+  const body = await readJson(req).catch(() => ({}));
+  const domain = normalizeDomain(body.website || body.domain);
+  const blocker = getBlockerState();
+  blocker.tier1.customWebsites = (blocker.tier1.customWebsites || []).filter((item) => item !== domain);
+  const updated = writeBlockerState(blocker);
+  sendJson(res, 200, { websites: getBlockerWebsites(), blocker: updated });
+}
+
+async function handleBlockerTier2(req, res) {
+  const body = await readJson(req).catch(() => ({}));
+  const blocker = getBlockerState();
+  blocker.tier2.enabled = Boolean(body.enabled);
+  if (blocker.tier2.enabled) {
+    blocker.tier2.screenTimeIntegration = true;
+    if (!blocker.tier1.enabled) {
+      blocker.tier1.enabled = true;
+      blocker.protectionEnabled = true;
+    }
+  }
+  const updated = writeBlockerState(blocker);
+  sendJson(res, 200, updated);
+}
+
+async function handleBlockerAddApp(req, res) {
+  const body = await readJson(req).catch(() => ({}));
+  const appId = String(body.appId || body.id || "").trim();
+  const appDef = AVAILABLE_APPS.find((app) => app.id === appId);
+  if (!appDef) {
+    return sendJson(res, 400, { error: "Unknown app." });
+  }
+  const blocker = getBlockerState();
+  const apps = blocker.tier2.apps || [];
+  if (apps.some((app) => app.id === appId)) {
+    return sendJson(res, 409, { error: "This app is already blocked." });
+  }
+  apps.push({ id: appDef.id, name: appDef.name, category: appDef.category, blockedAt: new Date().toISOString() });
+  blocker.tier2.apps = apps;
+  const updated = writeBlockerState(blocker);
+  sendJson(res, 200, { apps: getBlockerApps(), blocker: updated });
+}
+
+async function handleBlockerRemoveApp(req, res) {
+  const body = await readJson(req).catch(() => ({}));
+  const appId = String(body.appId || body.id || "").trim();
+  const blocker = getBlockerState();
+  if (blocker.tier3.enabled) {
+    return sendJson(res, 403, { error: "Permanent lock is active. Apps cannot be removed." });
+  }
+  blocker.tier2.apps = (blocker.tier2.apps || []).filter((app) => app.id !== appId);
+  const updated = writeBlockerState(blocker);
+  sendJson(res, 200, { apps: getBlockerApps(), blocker: updated });
+}
+
+async function handleBlockerTier3(req, res) {
+  const body = await readJson(req).catch(() => ({}));
+  const passcode = String(body.passcode || "").trim();
+  if (passcode.length < 4) {
+    return sendJson(res, 400, { error: "Passcode must be at least 4 digits." });
+  }
+  const blocker = getBlockerState();
+  if ((blocker.tier2.apps || []).length === 0) {
+    return sendJson(res, 400, { error: "Add at least one app to block before enabling permanent lock." });
+  }
+  blocker.tier3.enabled = true;
+  blocker.tier3.lockedAt = new Date().toISOString();
+  blocker.tier3.passcodeHash = hashPasscode(passcode);
+  blocker.tier2.enabled = true;
+  blocker.tier1.enabled = true;
+  blocker.protectionEnabled = true;
+  const updated = writeBlockerState(blocker);
+  sendJson(res, 200, updated);
+}
+
+async function handleBlockerTier3Unlock(req, res) {
+  const body = await readJson(req).catch(() => ({}));
+  const passcode = String(body.passcode || "").trim();
+  const blocker = getBlockerState();
+  if (!blocker.tier3.enabled) {
+    return sendJson(res, 400, { error: "Permanent lock is not active." });
+  }
+  if (hashPasscode(passcode) !== blocker.tier3.passcodeHash) {
+    return sendJson(res, 403, { error: "Incorrect passcode. The permanent lock remains in place." });
+  }
+  blocker.tier3.enabled = false;
+  blocker.tier3.lockedAt = null;
+  blocker.tier3.passcodeHash = null;
+  const updated = writeBlockerState(blocker);
+  sendJson(res, 200, updated);
+}
+
+const COMMUNITY_AVATARS = ["🐶", "🐱", "🦊", "🐻", "🐼", "🦁", "🐯", "🐨", "🐸", "🐵", "🦉", "hawk"];
+
+function createDefaultCommunityState(now = new Date()) {
+  const weekAgo = new Date(now.getTime() - 28 * DAY_MS);
+  const posts = [
+    {
+      id: crypto.randomUUID(),
+      author: "Constant Lie",
+      authorAvatar: "🦊",
+      streak: 0,
+      title: "Constant Lie",
+      body: "I do good for a week or so and then lie to myself that one time won't hurt. But it always does. How do you stop the self-deception?",
+      createdAt: new Date(now.getTime() - 28 * DAY_MS).toISOString(),
+      comments: [],
+      likes: 2,
+      likedByMe: false,
+      views: 44
+    },
+    {
+      id: crypto.randomUUID(),
+      author: "Nathan",
+      authorAvatar: "🐶",
+      streak: 14,
+      title: "Peace",
+      body: "Guys... I am so stoked right now. Two weeks clean and I finally feel like myself again. The fog is lifting. If you're struggling right now, keep going. It gets better.",
+      createdAt: new Date(now.getTime() - 21 * DAY_MS).toISOString(),
+      comments: [
+        { id: crypto.randomUUID(), author: "Ian Rent", authorAvatar: "🐻", text: "This is inspiring man, keep it up!", createdAt: new Date(now.getTime() - 20 * DAY_MS).toISOString() }
+      ],
+      likes: 9,
+      likedByMe: false,
+      views: 47
+    },
+    {
+      id: crypto.randomUUID(),
+      author: "Ian Rent",
+      authorAvatar: "🐻",
+      streak: 0,
+      title: "I keep doing it",
+      body: "I've been doing it at least once a day and it's pissing me off but it's a habit now. How do I stop?",
+      createdAt: new Date(now.getTime() - 14 * DAY_MS).toISOString(),
+      comments: [],
+      likes: 0,
+      likedByMe: false,
+      views: 52
+    },
+    {
+      id: crypto.randomUUID(),
+      author: "Rigoberto Reyes",
+      authorAvatar: "🦁",
+      streak: 3,
+      title: "I'm struggling",
+      body: "I'm having a very hard time with this. Every night it's the same battle. Any tips for getting through the late night urges?",
+      createdAt: new Date(now.getTime() - 10 * DAY_MS).toISOString(),
+      comments: [
+        { id: crypto.randomUUID(), author: "Kempa", authorAvatar: "🐼", text: "Cold showers at night helped me a lot. Stay strong brother.", createdAt: new Date(now.getTime() - 9 * DAY_MS).toISOString() }
+      ],
+      likes: 1,
+      likedByMe: false,
+      views: 60
+    },
+    {
+      id: crypto.randomUUID(),
+      author: "Kempa",
+      authorAvatar: "🐼",
+      streak: 0,
+      title: "Need a sex therapist hotline",
+      body: "I can't stop guys I need help. Does anyone know a hotline or resource I can call? I feel like I can't do this alone anymore.",
+      createdAt: new Date(now.getTime() - 7 * DAY_MS).toISOString(),
+      comments: [],
+      likes: 0,
+      likedByMe: false,
+      views: 55
+    },
+    {
+      id: crypto.randomUUID(),
+      author: "Zeke",
+      authorAvatar: "🐯",
+      streak: 15,
+      title: "Day 15",
+      body: "No porn, but I can't stop jerking off. How do I stop? The porn is gone but the habit is still there. Any advice?",
+      createdAt: new Date(now.getTime() - 3 * DAY_MS).toISOString(),
+      comments: [],
+      likes: 0,
+      likedByMe: false,
+      views: 86
+    },
+    {
+      id: crypto.randomUUID(),
+      author: "Anonymous",
+      authorAvatar: "🦉",
+      streak: 7,
+      title: "Don't go on Reddit or X",
+      body: "Seriously, those platforms are full of triggers. Deleted both apps and my urges dropped significantly. Highly recommend.",
+      createdAt: new Date(now.getTime() - 1 * DAY_MS).toISOString(),
+      comments: [],
+      likes: 5,
+      likedByMe: false,
+      views: 32
+    }
+  ];
+  return { posts, updatedAt: now.toISOString() };
+}
+
+function getCommunityState() {
+  const state = readQuittrState();
+  if (!state.community || !Array.isArray(state.community.posts)) {
+    const community = createDefaultCommunityState();
+    writeQuittrState({ ...state, community, updatedAt: new Date().toISOString() });
+    return community;
+  }
+  return state.community;
+}
+
+function writeCommunityState(community) {
+  const state = readQuittrState();
+  const updatedAt = new Date().toISOString();
+  community.updatedAt = updatedAt;
+  writeQuittrState({ ...state, community, updatedAt });
+  return community;
+}
+
+function formatTimeAgo(date) {
+  const diff = Date.now() - new Date(date).getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  const weeks = Math.floor(diff / 604800000);
+  if (weeks >= 1) return `${weeks}w ago`;
+  if (days >= 1) return `${days}d ago`;
+  if (hours >= 1) return `${hours}h ago`;
+  if (minutes >= 1) return `${minutes}m ago`;
+  return "just now";
+}
+
+function formatPost(post) {
+  return {
+    ...post,
+    timeAgo: formatTimeAgo(post.createdAt),
+    commentCount: (post.comments || []).length
+  };
+}
+
+function getCommunityPosts(filter) {
+  const community = getCommunityState();
+  let posts = (community.posts || []).slice();
+  if (filter === "top") {
+    posts.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+  } else {
+    posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+  return { posts: posts.map(formatPost) };
+}
+
+function getCommunityPost(id) {
+  const community = getCommunityState();
+  const post = (community.posts || []).find((p) => p.id === id);
+  if (!post) {
+    return { error: "Post not found" };
+  }
+  post.views = (post.views || 0) + 1;
+  writeCommunityState(community);
+  return { post: formatPost(post) };
+}
+
+async function handleCommunityCreatePost(req, res) {
+  const body = await readJson(req).catch(() => ({}));
+  const title = String(body.title || "").trim();
+  const postBody = String(body.body || "").trim();
+  if (!title && !postBody) {
+    return sendJson(res, 400, { error: "Post cannot be empty." });
+  }
+  const community = getCommunityState();
+  const avatar = COMMUNITY_AVATARS[Math.floor(Math.random() * COMMUNITY_AVATARS.length)];
+  const post = {
+    id: crypto.randomUUID(),
+    author: "You",
+    authorAvatar: avatar,
+    streak: 0,
+    title: title || "Untitled",
+    body: postBody,
+    createdAt: new Date().toISOString(),
+    comments: [],
+    likes: 0,
+    likedByMe: false,
+    views: 0
+  };
+  community.posts = [post, ...(community.posts || [])];
+  writeCommunityState(community);
+  sendJson(res, 200, { post: formatPost(post) });
+}
+
+async function handleCommunityComment(req, res) {
+  const body = await readJson(req).catch(() => ({}));
+  const postId = String(body.postId || "").trim();
+  const text = String(body.text || "").trim();
+  if (!text) {
+    return sendJson(res, 400, { error: "Comment cannot be empty." });
+  }
+  const community = getCommunityState();
+  const post = (community.posts || []).find((p) => p.id === postId);
+  if (!post) {
+    return sendJson(res, 404, { error: "Post not found." });
+  }
+  const avatar = COMMUNITY_AVATARS[Math.floor(Math.random() * COMMUNITY_AVATARS.length)];
+  const comment = {
+    id: crypto.randomUUID(),
+    author: "You",
+    authorAvatar: avatar,
+    text,
+    createdAt: new Date().toISOString()
+  };
+  post.comments = [comment, ...(post.comments || [])];
+  writeCommunityState(community);
+  sendJson(res, 200, { post: formatPost(post), comment });
+}
+
+async function handleCommunityLike(req, res) {
+  const body = await readJson(req).catch(() => ({}));
+  const postId = String(body.postId || "").trim();
+  const community = getCommunityState();
+  const post = (community.posts || []).find((p) => p.id === postId);
+  if (!post) {
+    return sendJson(res, 404, { error: "Post not found." });
+  }
+  post.likedByMe = !post.likedByMe;
+  post.likes = Math.max(0, (post.likes || 0) + (post.likedByMe ? 1 : -1));
+  writeCommunityState(community);
+  sendJson(res, 200, { post: formatPost(post) });
 }

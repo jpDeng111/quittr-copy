@@ -1,7 +1,7 @@
 {
-  "name": "video-script-extract",
+  "name": "quittr-dashboard",
   "version": "1.0.0",
-  "description": "Local web app to extract transcripts from video URLs",
+  "description": "Local Quittr recovery progress dashboard with Melius AI chat",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
