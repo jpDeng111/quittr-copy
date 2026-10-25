@@ -25,13 +25,7 @@ const COMMUNITY_COMMENT_ENDPOINT = `${API_BASE}/api/community/comment`;
 const COMMUNITY_LIKE_ENDPOINT = `${API_BASE}/api/community/like`;
 
 function resolveApiBase() {
-  const { hostname, port, protocol } = window.location;
-  const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
-
-  if (isLocalHost && port && port !== "3000") {
-    return `${protocol}//127.0.0.1:3000`;
-  }
-
+  // The Node server serves both the app and API, including an isolated test port.
   return "";
 }
 
@@ -94,12 +88,6 @@ const soundscapes = [
   { title: "Forest", tone: "forest", emoji: "\uD83C\uDF32", description: "Peaceful woodland" }
 ];
 
-const lessons = [
-  { title: "The Neuroscience of Porn Addictio...", status: "Completed", tone: "completed", icon: "check-circle" },
-  { title: "Debunking Common Myths A...", status: "Continue learning", tone: "current", icon: "dot" },
-  { title: "Psychological and Environmental F...", status: "Locked", tone: "locked", icon: "lock" }
-];
-
 const courseData = {
   title: "QUITTR's Guide to Recovery",
   tag: "QUITTR \u2022 Science-Backed",
@@ -107,210 +95,317 @@ const courseData = {
     {
       id: "ch1", title: "Understanding Addiction",
       lessons: [
-        { id: "ch1-l1", title: "The Neuroscience of Porn Addiction\u2014How It Hijacks the Brain", duration: "1 min", status: "completed",
+        { id: "ch1-l1", title: "The Neuroscience of Porn Addiction\u2014How It Hijacks the Brain", duration: "4 min", status: "completed",
           sections: [
-            { heading: "Introduction", body: "Porn addiction is not a moral failing\u2014it is a neurobiological process. When a person repeatedly views pornography, the brain\u2019s reward system (specifically the mesolimbic dopamine pathway) is activated in a way that mirrors substance addiction. Over time, the brain begins to depend on this hyper-stimulation for pleasure, and everyday experiences feel muted by comparison." },
-            { heading: "The Dopamine Hijack", body: "Dopamine is the brain\u2019s \u201Cwanting\u201D chemical. During porn consumption, dopamine floods the nucleus accumbens at levels far exceeding what natural rewards (food, social connection, exercise) can produce. With repeated exposure, dopamine receptors down-regulate\u2014meaning more extreme or novel content is needed to achieve the same arousal. This is the same tolerance mechanism seen in cocaine and opioid addiction (Koob & Le Moal, 2008)." },
-            { heading: "Prefrontal Cortex Impairment", body: "The prefrontal cortex (PFC) governs impulse control, future planning, and moral reasoning. Neuroimaging studies show that compulsive porn users exhibit reduced gray matter volume and decreased activity in the PFC (K\u00FChn & Gallinat, 2014). This means the brain\u2019s \u201Cbrake system\u201D is weakened, making it harder to resist urges even when you consciously want to stop." },
-            { heading: "The Habit Loop", body: "Addiction follows a three-part loop: Cue (boredom, stress, loneliness) \u2192 Routine (viewing porn) \u2192 Reward (dopamine release). Over time, this loop becomes automatic, encoded in the basal ganglia. Understanding this loop is the first step toward breaking it\u2014because you cannot change what you do not understand." }
+            { heading: "Introduction", body: "Porn addiction is not a moral failing\u2014it is a neurobiological process. When a person repeatedly views pornography, the brain\u2019s reward system (specifically the mesolimbic dopamine pathway) is activated in a way that mirrors substance addiction. Over time, the brain begins to depend on this hyper-stimulation for pleasure, and everyday experiences feel muted by comparison. Understanding the science removes shame and replaces it with a clear, actionable framework for change." },
+            { heading: "The Dopamine Hijack", body: "Dopamine is the brain\u2019s \u201Cwanting\u201D chemical\u2014it drives motivation and anticipation, not just pleasure. During porn consumption, dopamine floods the nucleus accumbens at levels far exceeding what natural rewards (food, social connection, exercise) can produce. The novelty of endless new content creates what researchers call the \u201CCoolidge Effect\u201D\u2014a renewed surge of arousal with each new stimulus. With repeated exposure, dopamine receptors down-regulate, meaning more extreme or novel content is needed to achieve the same arousal. This is the same tolerance mechanism seen in cocaine and opioid addiction (Koob & Le Moal, 2008)." },
+            { heading: "Prefrontal Cortex Impairment", body: "The prefrontal cortex (PFC) governs impulse control, future planning, and moral reasoning. Neuroimaging studies show that compulsive porn users exhibit reduced gray matter volume and decreased activity in the PFC (K\u00FChn & Gallinat, 2014). This weakens the brain\u2019s \u201Cbrake system,\u201D making it harder to resist urges even when you consciously want to stop. This is called hypofrontality\u2014and it explains why willpower alone so often fails. The good news: the PFC can strengthen again with abstinence and deliberate practice." },
+            { heading: "The Three-Part Brain in Conflict", body: "Think of your brain as three systems: (1) The Reward System (limbic)\u2014primal, fast, craves instant gratification. (2) The Prefrontal Cortex\u2014rational, slow, considers long-term consequences. (3) The Stress System (amygdala)\u2014triggers urges under pressure. In addiction, the reward and stress systems dominate while the PFC is suppressed. Recovery is essentially retraining the PFC to regain control of the reward system." },
+            { heading: "The Habit Loop", body: "Addiction follows a three-part loop: Cue (boredom, stress, loneliness) \u2192 Routine (viewing porn) \u2192 Reward (dopamine release). Over time, this loop becomes automatic, encoded in the basal ganglia\u2014the brain\u2019s autopilot center. This is why urges can feel involuntary. The key insight from Charles Duhigg\u2019s research: you cannot erase a habit loop, but you can rewire it by keeping the same cue and reward while changing the routine." },
+            { heading: "Key Takeaways", body: "1) Addiction is a brain-based process, not a character flaw. 2) Dopamine drives craving and tolerance escalation. 3) The prefrontal cortex\u2014your self-control center\u2014is weakened but can be rebuilt. 4) Habits are neural loops that can be rewired, not erased. Knowledge itself is a tool: the more you understand the mechanism, the less power the urge holds over you." }
           ],
-          reflection: "Think about the last time you felt a strong urge. What was the cue? Were you stressed, bored, or lonely? Identifying your most common trigger is the first step in rewiring the habit loop."
+          reflection: "Think about the last time you felt a strong urge. What was the cue? Were you stressed, bored, or lonely? Write down your three most common cues. Identifying your triggers is the first step in rewiring the habit loop\u2014because you cannot change what you cannot see."
         },
-        { id: "ch1-l2", title: "Debunking Common Myths About Porn Addiction", duration: "1 min", status: "completed",
+        { id: "ch1-l2", title: "Debunking Common Myths About Porn Addiction", duration: "4 min", status: "completed",
           sections: [
-            { heading: "Myth #1: \u201CIt\u2019s not addiction if I can stop anytime.\u201D", body: "Neuroscientific evidence confirms that repeated exposure to high-stimulation porn activates the brain\u2019s reward circuit, leading to tolerance and withdrawal symptoms\u2014key markers of addiction. The ability to \u201Cstop anytime\u201D often reflects denial or lack of awareness, not genuine control. Studies show compulsive porn users exhibit brain patterns similar to those with substance use disorders (Voon et al., 2014)." },
-            { heading: "Myth #2: \u201CIt\u2019s harmless because it\u2019s not a substance.\u201D", body: "Behavioral addictions can be just as powerful as substance addictions. The brain does not distinguish between a chemical dopamine trigger and a visual one\u2014both activate the same neural pathways. Research in the Journal of Behavioral Addictions found that compulsive porn users show identical patterns of craving, tolerance, and withdrawal as gambling addicts (Brand et al., 2016)." },
-            { heading: "Myth #3: \u201CEveryone watches it, so it must be normal.\u201D", body: "Prevalence does not equal harmlessness. While consumption is widespread, compulsive use\u2014characterized by loss of control, escalation, and continued use despite negative consequences\u2014affects an estimated 3\u20136% of users (Reid et al., 2020). Normalizing the behavior can prevent people from recognizing when it has become a problem." },
-            { heading: "Myth #4: \u201CMy partner won\u2019t notice\u2014I\u2019m still faithful.\u201D", body: "Even without physical infidelity, emotional disconnection, secrecy, and loss of intimacy are common consequences. A 2021 study in the Journal of Sex & Marital Therapy found that couples where one partner engaged in regular porn use reported significantly lower relationship satisfaction and higher conflict frequency." }
+            { heading: "Why Myths Matter", body: "Myths about porn are dangerous because they keep people trapped in denial. If you believe your behavior is harmless or fully under control, you have no reason to change. Let\u2019s examine the most common myths with evidence\u2014not judgment\u2014so you can make an informed decision about your own life." },
+            { heading: "Myth #1: \u201CIt\u2019s not addiction if I can stop anytime.\u201D", body: "Neuroscientific evidence confirms that repeated exposure to high-stimulation porn activates the brain\u2019s reward circuit, leading to tolerance and withdrawal symptoms\u2014key markers of addiction. The ability to \u201Cstop anytime\u201D often reflects denial or lack of awareness, not genuine control. A simple test: try stopping completely for 30 days. If it\u2019s truly easy, you have nothing to worry about. If it feels impossible, that resistance is itself the answer. Studies show compulsive porn users exhibit brain patterns similar to those with substance use disorders (Voon et al., 2014)." },
+            { heading: "Myth #2: \u201CIt\u2019s harmless because it\u2019s not a substance.\u201D", body: "Behavioral addictions can be just as powerful as substance addictions. The brain does not distinguish between a chemical dopamine trigger and a visual one\u2014both activate the same neural pathways. The DSM-5 and ICD-11 now recognize behavioral addictions (gambling, gaming) as legitimate disorders. Research in the Journal of Behavioral Addictions found that compulsive porn users show identical patterns of craving, tolerance, and withdrawal as gambling addicts (Brand et al., 2016)." },
+            { heading: "Myth #3: \u201CEveryone watches it, so it must be normal.\u201D", body: "Prevalence does not equal harmlessness. While consumption is widespread, compulsive use\u2014characterized by loss of control, escalation, and continued use despite negative consequences\u2014affects an estimated 3\u20136% of users (Reid et al., 2020). \u201CNormal\u201D and \u201Chealthy\u201D are not the same thing. Normalizing the behavior can prevent people from recognizing when it has become a problem." },
+            { heading: "Myth #4: \u201CIt improves my sex life and keeps me satisfied.\u201D", body: "The opposite is often true. Chronic porn use is a leading contributor to porn-induced erectile dysfunction (PIED) in young men\u2014a phenomenon virtually unheard of a generation ago. It conditions arousal to screens rather than partners, raises unrealistic expectations, and reduces satisfaction with real intimacy. Many men report dramatic improvements in real-life sexual function after quitting." },
+            { heading: "Myth #5: \u201CMy partner won\u2019t notice\u2014I\u2019m still faithful.\u201D", body: "Even without physical infidelity, emotional disconnection, secrecy, and loss of intimacy are common consequences. A 2021 study in the Journal of Sex & Marital Therapy found that couples where one partner engaged in regular porn use reported significantly lower relationship satisfaction and higher conflict frequency. Secrecy itself\u2014not just the act\u2014erodes trust." }
           ],
-          reflection: "If you\u2019re questioning whether your viewing habits are problematic, ask yourself: Do I feel shame afterward? Do I hide my usage? Does it interfere with responsibilities or relationships? Two or more \u201Cyes\u201D answers suggest it\u2019s time to explore change."
+          reflection: "Which of these myths have you told yourself? Be honest\u2014this is a private moment of self-reflection. If you\u2019re questioning whether your habits are problematic, ask: Do I feel shame afterward? Do I hide my usage? Does it interfere with my responsibilities or relationships? Two or more \u201Cyes\u201D answers suggest it\u2019s time to explore change."
         },
-        { id: "ch1-l3", title: "Psychological and Environmental Factors Contributing to Porn Addiction", duration: "1 min", status: "completed",
+        { id: "ch1-l3", title: "Psychological and Environmental Factors Contributing to Porn Addiction", duration: "4 min", status: "completed",
           sections: [
-            { heading: "Psychological Vulnerabilities", body: "Porn addiction rarely exists in isolation. Research shows that over 70% of individuals seeking treatment also report symptoms of anxiety, depression, ADHD, PTSD, or social anxiety (APA, 2022). Porn often serves as a coping mechanism\u2014a way to numb emotional pain, escape stress, or fill a void of loneliness." },
-            { heading: "Childhood and Adolescent Exposure", body: "Early exposure to pornography (before age 14) is associated with higher rates of compulsive use in adulthood. The adolescent brain is in a critical period of synaptic pruning\u2014neural pathways formed during this time become deeply ingrained. Early exposure essentially \u201Cteaches\u201D the developing brain that sexual arousal is linked to screen-based stimulation." },
-            { heading: "Environmental Triggers", body: "Unrestricted internet access, lack of accountability, social isolation, and high-stress environments all increase vulnerability. The \u201CTriple-A Engine\u201D (Accessibility, Affordability, Anonymity) makes porn uniquely addictive compared to previous eras. Environmental design\u2014such as keeping devices out of the bedroom\u2014can significantly reduce compulsive use." },
-            { heading: "Attachment and Connection", body: "Attachment theory suggests that insecure attachment styles (anxious or avoidant) increase addiction risk. People who struggle with emotional intimacy may turn to porn as a \u201Csafe\u201D substitute for real connection. Building secure relationships\u2014with friends, partners, or support groups\u2014is a powerful protective factor." }
+            { heading: "Addiction Rarely Stands Alone", body: "Porn addiction is almost always a symptom of deeper needs. It is what psychologists call a \u201Cprocess addiction\u201D\u2014a behavior used to regulate emotion. To recover sustainably, you must address not just the behavior, but the underlying drivers that make it so compelling. This lesson maps those drivers." },
+            { heading: "Psychological Vulnerabilities", body: "Porn addiction rarely exists in isolation. Research shows that over 70% of individuals seeking treatment also report symptoms of anxiety, depression, ADHD, PTSD, or social anxiety (APA, 2022). Porn often serves as a coping mechanism\u2014a way to numb emotional pain, escape stress, or fill a void of loneliness. Identifying your emotional \u201Cwhy\u201D is essential: what feeling are you trying to escape or create when you reach for it?" },
+            { heading: "Childhood and Adolescent Exposure", body: "Early exposure to pornography (before age 14) is associated with higher rates of compulsive use in adulthood. The adolescent brain is in a critical period of synaptic pruning\u2014neural pathways formed during this time become deeply ingrained. Early exposure essentially \u201Cteaches\u201D the developing brain that sexual arousal is linked to screen-based stimulation, a template that can persist for decades." },
+            { heading: "Trauma and Emotional Regulation", body: "Adverse Childhood Experiences (ACEs)\u2014abuse, neglect, household dysfunction\u2014significantly raise addiction risk. The landmark ACE study found a strong dose-response relationship between childhood trauma and later addictive behaviors. Porn can become a form of self-medication for unprocessed trauma. This is why trauma-informed therapy (like EMDR) is often a powerful part of recovery for those with difficult histories." },
+            { heading: "Environmental Triggers", body: "Unrestricted internet access, lack of accountability, social isolation, and high-stress environments all increase vulnerability. The \u201CTriple-A Engine\u201D (Accessibility, Affordability, Anonymity) makes porn uniquely addictive compared to previous eras\u2014it is always available, free, and private. Environmental design\u2014such as keeping devices out of the bedroom and using content blockers\u2014can significantly reduce compulsive use by increasing friction." },
+            { heading: "Attachment and Connection", body: "Attachment theory suggests that insecure attachment styles (anxious or avoidant) increase addiction risk. People who struggle with emotional intimacy may turn to porn as a \u201Csafe\u201D substitute for real connection\u2014it offers stimulation without the vulnerability of relationships. As addiction expert Dr. Gabor Mat\u00E9 puts it: \u201CThe opposite of addiction is not sobriety\u2014it is connection.\u201D Building secure relationships is one of the most powerful protective factors." }
           ],
-          reflection: "Consider your environment: Are there spaces or times where you\u2019re most vulnerable? What one change could you make today to reduce exposure\u2014like charging your phone outside the bedroom?"
+          reflection: "Consider your environment and history: Are there spaces or times where you\u2019re most vulnerable? What emotional need does porn typically meet for you\u2014comfort, escape, stimulation, connection? What one change could you make today to reduce exposure, like charging your phone outside the bedroom?"
         },
-        { id: "ch1-l4", title: "The Porn Addiction Cycle\u2014Recognizing Triggers and Patterns", duration: "1 min", status: "completed",
+        { id: "ch1-l4", title: "The Porn Addiction Cycle\u2014Recognizing Triggers and Patterns", duration: "4 min", status: "completed",
           sections: [
-            { heading: "The Cycle of Compulsive Use", body: "The addiction cycle follows a predictable pattern: Emotional Trigger (stress, boredom, rejection) \u2192 Fantasy and Anticipation \u2192 Ritualized Searching \u2192 Consumption \u2192 Temporary Relief \u2192 Shame and Guilt \u2192 Return to Trigger. This cycle can repeat daily or multiple times per day, each iteration strengthening the neural pathway." },
-            { heading: "Identifying Your Triggers", body: "Common triggers include: HALT states (Hungry, Angry, Lonely, Tired), unstructured time, social media exposure, relationship conflict, and work stress. Keeping a trigger journal\u2014recording the time, emotion, and context of each urge\u2014helps you identify patterns and develop targeted coping strategies." },
-            { heading: "The Role of Shame", body: "Shame is both a consequence and a fuel of addiction. After consumption, shame activates the same stress pathways that triggered the behavior initially\u2014creating a self-perpetuating loop. Breaking this cycle requires self-compassion, not self-punishment. Research by Dr. Kristin Neff shows that self-compassion practices reduce shame-driven behaviors by 40% (Neff, 2011)." },
-            { heading: "Breaking the Pattern", body: "Evidence-based strategies include: (1) The 10-Minute Rule\u2014delay acting on the urge for 10 minutes, during which the intensity typically drops by 50%. (2) Environment Shift\u2014physically move to a different room or go outside. (3) Replacement Behavior\u2014engage in a pre-planned activity (push-ups, cold water on face, calling a friend)." }
+            { heading: "The Cycle of Compulsive Use", body: "The addiction cycle follows a predictable pattern: Emotional Trigger (stress, boredom, rejection) \u2192 Fantasy and Anticipation \u2192 Ritualized Searching \u2192 Consumption \u2192 Temporary Relief \u2192 Shame and Guilt \u2192 Return to Trigger. This cycle can repeat daily or multiple times per day, each iteration strengthening the neural pathway. Recognizing which stage you\u2019re in gives you an intervention point." },
+            { heading: "The Point of No Return", body: "Every cycle has a \u201Cpoint of no return\u201D\u2014a moment after which relapse feels inevitable. Critically, this point is much earlier than most people think. It\u2019s not when you open the content; it\u2019s often the first small decision (picking up the phone, lying in bed with nothing to do). The most effective intervention happens at the earliest stage\u2014the trigger and anticipation phase\u2014not the final moment of temptation." },
+            { heading: "Identifying Your Triggers", body: "Common triggers include: HALT states (Hungry, Angry, Lonely, Tired), unstructured time, social media exposure, relationship conflict, and work stress. Triggers fall into two categories: internal (emotions, thoughts, physical states) and external (locations, times, devices, people). Keeping a trigger journal\u2014recording the time, emotion, and context of each urge\u2014helps you identify patterns and develop targeted coping strategies." },
+            { heading: "The Role of Shame", body: "Shame is both a consequence and a fuel of addiction. After consumption, shame activates the same stress pathways that triggered the behavior initially\u2014creating a self-perpetuating loop where the guilt from acting out becomes the trigger for the next episode. Breaking this cycle requires self-compassion, not self-punishment. Research by Dr. Kristin Neff shows that self-compassion practices reduce shame-driven behaviors by 40% (Neff, 2011)." },
+            { heading: "Urge Surfing", body: "Urges are like ocean waves\u2014they rise, peak, and fall. They typically last only 15\u201330 minutes if you don\u2019t feed them. \u201CUrge surfing,\u201D a mindfulness technique from Dr. Alan Marlatt, involves observing the urge without acting: notice where you feel it in your body, breathe into it, and ride it like a wave until it naturally subsides. Each time you surf an urge instead of acting, you weaken the addictive pathway." },
+            { heading: "Breaking the Pattern", body: "Evidence-based strategies include: (1) The 10-Minute Rule\u2014delay acting on the urge for 10 minutes, during which the intensity typically drops by 50%. (2) Environment Shift\u2014physically move to a different room or go outside; changing your physical context disrupts the automatic loop. (3) Replacement Behavior\u2014engage in a pre-planned activity (push-ups, cold water on face, calling a friend). (4) The Play-It-Forward technique\u2014vividly imagine how you\u2019ll feel 30 minutes after acting out versus after resisting." }
           ],
-          reflection: "For the next 3 days, try keeping a simple trigger log. Each time you feel an urge, write down: Time, Emotion, Location, and What happened before. Patterns will emerge that give you power over the cycle."
+          reflection: "For the next 3 days, keep a simple trigger log. Each time you feel an urge, write down: Time, Emotion, Location, and What happened just before. Also note whether you acted or resisted, and how you felt afterward. Patterns will emerge that give you power over the cycle."
         },
-        { id: "ch1-l5", title: "The Impact of Stigma on Porn Addiction and Recovery", duration: "1 min", status: "completed",
+        { id: "ch1-l5", title: "The Impact of Stigma on Porn Addiction and Recovery", duration: "3 min", status: "completed",
           sections: [
-            { heading: "The Weight of Stigma", body: "Porn addiction carries a unique double stigma: the shame of addiction combined with the taboo nature of sexual behavior. This stigma prevents many people from seeking help\u2014research shows that individuals with sexual compulsions are 3x less likely to seek professional support than those with other addictions (Lewer et al., 2019)." },
-            { heading: "Internalized Shame vs. Guilt", body: "Guilt says \u201CI did something bad.\u201D Shame says \u201CI am bad.\u201D Guilt can motivate change; shame paralyzes it. Studies consistently show that shame-based self-talk increases relapse rates, while self-compassion and cognitive reframing improve recovery outcomes. The language you use with yourself matters enormously." },
-            { heading: "Breaking the Silence", body: "Recovery begins in community. Sharing your struggle\u2014with a therapist, support group, or trusted person\u2014reduces the power of stigma. Anonymous support groups (online or in-person) provide a judgment-free space. Research shows that group-based interventions reduce shame by 55% and improve sustained recovery by 40% (Hook et al., 2021)." },
-            { heading: "Reframing the Narrative", body: "Addiction is not a character flaw\u2014it is a learned behavior driven by neurobiology, environment, and unmet needs. Recovery is not about willpower alone; it requires systems, support, and self-understanding. Every person who recovers is proof that the brain can heal and that change is possible." }
+            { heading: "The Weight of Stigma", body: "Porn addiction carries a unique double stigma: the shame of addiction combined with the taboo nature of sexual behavior. This stigma prevents many people from seeking help\u2014research shows that individuals with sexual compulsions are 3x less likely to seek professional support than those with other addictions (Lewer et al., 2019). The silence that stigma enforces is one of addiction\u2019s most powerful allies." },
+            { heading: "Internalized Shame vs. Guilt", body: "Guilt says \u201CI did something bad.\u201D Shame says \u201CI am bad.\u201D Guilt can motivate change; shame paralyzes it. Studies consistently show that shame-based self-talk increases relapse rates, while self-compassion and cognitive reframing improve recovery outcomes. The language you use with yourself matters enormously\u2014it is the difference between \u201CI\u2019m a failure\u201D and \u201CI\u2019m a person working on a hard problem.\u201D" },
+            { heading: "How Stigma Fuels the Cycle", body: "Here is the cruel irony: stigma and shame don\u2019t reduce the behavior\u2014they amplify it. Shame creates emotional pain, and porn is used to escape emotional pain. So the very shame meant to \u201Cstop\u201D the behavior becomes the fuel that drives the next episode. Releasing shame is not letting yourself off the hook\u2014it is removing the fuel from the fire." },
+            { heading: "Breaking the Silence", body: "Recovery begins in community. Sharing your struggle\u2014with a therapist, support group, or trusted person\u2014reduces the power of stigma. The act of speaking a secret out loud drains it of much of its power. Anonymous support groups (online or in-person) provide a judgment-free space. Research shows that group-based interventions reduce shame by 55% and improve sustained recovery by 40% (Hook et al., 2021)." },
+            { heading: "Reframing the Narrative", body: "Addiction is not a character flaw\u2014it is a learned behavior driven by neurobiology, environment, and unmet needs. Recovery is not about willpower alone; it requires systems, support, and self-understanding. Every person who recovers is proof that the brain can heal and that change is possible. You are not broken; you are healing." }
           ],
-          reflection: "Write a letter to yourself from the perspective of a compassionate friend. What would they say about your struggle? How would they describe your courage in seeking change? Keep this letter for difficult moments."
+          reflection: "Write a letter to yourself from the perspective of a compassionate friend\u2014someone who knows your struggle and loves you anyway. What would they say about your courage in seeking change? How would they encourage you? Keep this letter and read it during difficult moments."
         }
       ]
     },
     {
       id: "ch2", title: "Health Effects",
       lessons: [
-        { id: "ch2-l1", title: "Physical Health Consequences of Porn Addiction", duration: "1 min", status: "completed",
+        { id: "ch2-l1", title: "Physical Health Consequences of Porn Addiction", duration: "4 min", status: "completed",
           sections: [
-            { heading: "Introduction", body: "Porn addiction is often perceived as a purely psychological issue, but it can have significant physical health consequences. Understanding these effects is crucial for recognizing the seriousness of the addiction and motivating steps toward recovery." },
+            { heading: "Introduction", body: "Porn addiction is often perceived as a purely psychological issue, but it can have significant physical health consequences. Understanding these effects is crucial for recognizing the seriousness of the addiction and motivating steps toward recovery. Importantly, most of these effects are reversible\u2014the body is remarkably good at healing once the behavior stops." },
             { heading: "Sexual Dysfunction", body: "One of the most direct physical impacts is sexual dysfunction, particularly in men. This manifests as: Erectile Dysfunction (ED)\u2014chronic consumption desensitizes the brain\u2019s response to sexual stimuli, making it difficult to achieve or maintain an erection with a real-life partner. Delayed Ejaculation\u2014overstimulation leads to difficulties reaching orgasm during physical intimacy. Decreased Sex Drive\u2014overreliance on pornography reduces interest in actual sexual encounters." },
+            { heading: "Porn-Induced Erectile Dysfunction (PIED)", body: "PIED is a distinct, modern phenomenon. Rates of ED in men under 40 have risen dramatically\u2014from around 2\u20133% historically to as high as 30% in some recent surveys (Park et al., 2016). Unlike physical ED, PIED has a behavioral cause and a behavioral cure. Studies and thousands of self-reports document that abstaining from porn restores normal function, often within 2\u20133 months. The body was never broken\u2014the wiring was simply miscalibrated." },
             { heading: "Desensitization and Tolerance", body: "Repeated exposure to high-intensity sexual content leads to desensitization. Over time, more extreme or novel content is needed to achieve the same level of arousal. This escalation can alter sexual preferences\u2014individuals may develop preferences that do not align with their real-life desires or values. It also reduces sensitivity to physical touch\u2014real-life intimacy may feel less satisfying compared to exaggerated scenarios." },
-            { heading: "Sleep Disruption and Fatigue", body: "Late-night porn consumption disrupts circadian rhythms and reduces sleep quality. Blue light from screens suppresses melatonin production, while the dopamine surge makes it difficult to fall asleep. Chronic sleep deprivation compounds every other health issue\u2014weakening immunity, impairing cognition, and increasing depression risk." }
+            { heading: "Sleep Disruption and Fatigue", body: "Late-night porn consumption disrupts circadian rhythms and reduces sleep quality. Blue light from screens suppresses melatonin production, while the dopamine surge makes it difficult to fall asleep. Chronic sleep deprivation compounds every other health issue\u2014weakening immunity, impairing cognition, and increasing depression risk. The 2 AM \u201Cjust one more\u201D session steals not just time, but next-day health." },
+            { heading: "The Reversibility Principle", body: "Here is the encouraging truth: nearly all of these physical effects reverse with abstinence. The brain\u2019s reward system recalibrates, dopamine sensitivity returns, sexual function normalizes, and sleep improves. The timeline varies\u2014some notice changes in weeks, others in months\u2014but the direction of healing is consistent. Your body is on your side." }
           ],
-          reflection: "Notice how your body feels after extended screen time. Are you sleeping well? Do you feel physically energized? Your body is sending signals\u2014learning to listen to them is a key part of recovery."
+          reflection: "Notice how your body feels after extended screen time. Are you sleeping well? Do you feel physically energized or drained? Do you notice any of the effects described here? Your body is sending signals\u2014learning to listen to them without shame is a key part of recovery."
         },
-        { id: "ch2-l2", title: "Mental Health and Emotional Well-being Impact", duration: "1 min", status: "current",
+        { id: "ch2-l2", title: "Mental Health and Emotional Well-being Impact", duration: "4 min", status: "current",
           sections: [
-            { heading: "The Depression-Anxiety Cycle", body: "Compulsive porn use is strongly correlated with depression and anxiety. A meta-analysis of 27 studies found that problematic porn users were 2.3x more likely to report clinical depression (Wright et al., 2021). The mechanism involves dopamine depletion (reducing motivation and pleasure), shame-driven isolation, and the loss of natural reward sensitivity." },
-            { heading: "Cognitive Effects", body: "Regular compulsive porn use impairs executive function\u2014the brain\u2019s ability to focus, plan, make decisions, and regulate emotions. fMRI studies show reduced connectivity between the prefrontal cortex and the limbic system in compulsive users, making it harder to \u201Cthink clearly\u201D under stress (Brand et al., 2016). Many users report brain fog, poor concentration, and decreased productivity." },
-            { heading: "Emotional Numbing", body: "Over time, the constant dopamine spikes and crashes lead to emotional blunting\u2014a reduced ability to feel joy, excitement, or deep connection. This is not permanent. With sustained recovery, emotional sensitivity gradually returns, often within 4\u20138 weeks. Users frequently report that colors seem brighter, music sounds better, and relationships feel more meaningful." },
-            { heading: "Social Anxiety and Isolation", body: "Shame and secrecy drive social withdrawal. As porn use increases, people often reduce social activities, avoid intimate relationships, and become increasingly isolated. This isolation then fuels further compulsive use\u2014creating a self-reinforcing cycle. Breaking isolation through even small social connections is a powerful recovery tool." }
+            { heading: "The Depression-Anxiety Cycle", body: "Compulsive porn use is strongly correlated with depression and anxiety. A meta-analysis of 27 studies found that problematic porn users were 2.3x more likely to report clinical depression (Wright et al., 2021). The mechanism involves dopamine depletion (reducing motivation and pleasure), shame-driven isolation, and the loss of natural reward sensitivity. It becomes a vicious cycle: low mood triggers use, and use deepens low mood." },
+            { heading: "Cognitive Effects and Brain Fog", body: "Regular compulsive porn use impairs executive function\u2014the brain\u2019s ability to focus, plan, make decisions, and regulate emotions. fMRI studies show reduced connectivity between the prefrontal cortex and the limbic system in compulsive users, making it harder to \u201Cthink clearly\u201D under stress (Brand et al., 2016). Many users report brain fog, poor concentration, and decreased productivity\u2014symptoms that often lift noticeably within the first few weeks of recovery." },
+            { heading: "Emotional Numbing", body: "Over time, the constant dopamine spikes and crashes lead to emotional blunting\u2014a reduced ability to feel joy, excitement, or deep connection. Life can start to feel gray and flat. This is not permanent. With sustained recovery, emotional sensitivity gradually returns, often within 4\u20138 weeks. Users frequently report that colors seem brighter, music sounds better, and relationships feel more meaningful\u2014a phenomenon sometimes called the \u201Creboot glow.\u201D" },
+            { heading: "Anxiety and the Nervous System", body: "Compulsive use keeps the nervous system in a state of dysregulation\u2014swinging between the hyper-arousal of seeking and the crash afterward. This chronic activation raises baseline anxiety. As the dopamine system stabilizes in recovery, many people experience a marked drop in general anxiety and a greater sense of calm and groundedness." },
+            { heading: "Social Anxiety and Isolation", body: "Shame and secrecy drive social withdrawal. As porn use increases, people often reduce social activities, avoid intimate relationships, and become increasingly isolated. This isolation then fuels further compulsive use\u2014creating a self-reinforcing cycle. Breaking isolation through even small social connections\u2014a text to a friend, a walk in public, a support group\u2014is a powerful recovery tool." }
           ],
-          reflection: "Rate your current mood, energy, and focus on a scale of 1\u201310. Track these daily for a week. Many people notice that their ratings improve as they reduce compulsive behaviors\u2014visible proof that the brain is healing."
+          reflection: "Rate your current mood, energy, and focus on a scale of 1\u201310. Track these three numbers daily for one week. Many people notice that their ratings steadily improve as they reduce compulsive behaviors\u2014giving you visible, personal proof that your brain is healing."
         },
-        { id: "ch2-l3", title: "Effects on Relationships and Intimacy", duration: "1 min", status: "locked",
+        { id: "ch2-l3", title: "Effects on Relationships and Intimacy", duration: "4 min", status: "locked",
           sections: [
-            { heading: "The Intimacy Paradox", body: "Porn addiction creates a paradox: the more a person consumes, the less capable they become of genuine intimacy. The brain becomes conditioned to respond to pixels on a screen rather than the complex, imperfect reality of human connection. Partners often sense the emotional withdrawal even without knowing the cause." },
-            { heading: "Trust and Transparency", body: "Secrecy erodes trust\u2014the foundation of every relationship. Research shows that when a partner discovers compulsive porn use, the emotional impact mirrors the betrayal trauma of physical infidelity (Steffens & Means, 2009). Rebuilding trust requires radical transparency, consistent behavior change, and often professional couples counseling." },
-            { heading: "Sexual Compatibility Issues", body: "Compulsive porn use can create unrealistic expectations about sexual performance, body image, and frequency. These expectations can lead to dissatisfaction with real partners, performance anxiety, and avoidance of physical intimacy. Recovery often involves \u201Crewiring\u201D sexual expectations to align with reality." },
-            { heading: "Healing Together", body: "Couples who address porn addiction together\u2014through therapy, open communication, and shared goals\u2014often emerge with stronger relationships than before. The process of vulnerability, accountability, and mutual support builds deeper intimacy than existed previously. Programs like SASH (Society for the Advancement of Sexual Health) offer specialized couples resources." }
+            { heading: "The Intimacy Paradox", body: "Porn addiction creates a paradox: the more a person consumes, the less capable they become of genuine intimacy. The brain becomes conditioned to respond to pixels on a screen rather than the complex, imperfect reality of human connection. Partners often sense the emotional withdrawal even without knowing the cause, describing their partner as \u201Cpresent but not really there.\u201D" },
+            { heading: "Trust and Transparency", body: "Secrecy erodes trust\u2014the foundation of every relationship. Research shows that when a partner discovers compulsive porn use, the emotional impact mirrors the betrayal trauma of physical infidelity (Steffens & Means, 2009). Rebuilding trust requires radical transparency, consistent behavior change, and often professional couples counseling. Trust is rebuilt not through words, but through a track record of consistent action over time." },
+            { heading: "Sexual Compatibility Issues", body: "Compulsive porn use can create unrealistic expectations about sexual performance, body image, and frequency. These expectations can lead to dissatisfaction with real partners, performance anxiety, and avoidance of physical intimacy. Recovery often involves \u201Crewiring\u201D sexual expectations to align with reality\u2014rediscovering that real intimacy, with all its imperfection, is far more fulfilling than any screen." },
+            { heading: "Comparison and Objectification", body: "Chronic exposure trains the brain to objectify\u2014to evaluate partners against impossible standards and reduce people to body parts. This undermines the emotional bond that healthy intimacy requires. In recovery, many people report a profound shift: they begin to see their partner as a whole person again, and attraction deepens as a result." },
+            { heading: "Healing Together", body: "Couples who address porn addiction together\u2014through therapy, open communication, and shared goals\u2014often emerge with stronger relationships than before. The process of vulnerability, accountability, and mutual support builds deeper intimacy than existed previously. Programs like SASH (Society for the Advancement of Sexual Health) and couples therapy modalities such as EFT (Emotionally Focused Therapy) offer specialized support." }
           ],
-          reflection: "If you\u2019re in a relationship, consider: How has your behavior affected your emotional availability? What one step could you take toward greater honesty\u2014whether with your partner, a therapist, or yourself?"
+          reflection: "If you\u2019re in a relationship, consider: How has your behavior affected your emotional availability and presence? What one step could you take toward greater honesty and connection\u2014whether with your partner, a therapist, or yourself? If you\u2019re single, how might these patterns be shaping what you look for in others?"
         },
-        { id: "ch2-l4", title: "Impact on Productivity and Daily Life", duration: "1 min", status: "locked",
+        { id: "ch2-l4", title: "Impact on Productivity and Daily Life", duration: "3 min", status: "locked",
           sections: [
-            { heading: "Time and Energy Drain", body: "Compulsive porn use consumes enormous amounts of time\u2014not just the act itself, but the mental energy of anticipation, searching, and post-consumption shame. Users report losing 1\u20133 hours per day to the cycle. This is time stolen from work, relationships, exercise, hobbies, and sleep." },
-            { heading: "Workplace Consequences", body: "Decreased concentration, missed deadlines, and risky behavior (viewing at work) are common. A survey by the American Academy of Matrimonial Lawyers found that porn use was cited as evidence in 56% of divorce cases, and workplace viewing was a factor in many employment terminations." },
-            { heading: "Motivation and Goal Pursuit", body: "Dopamine is the brain\u2019s motivation chemical. When it\u2019s chronically depleted by hyper-stimulation, pursuing long-term goals feels unrewarding. This is why many compulsive users report a loss of ambition, procrastination, and a sense of \u201Cstuckness.\u201D Recovery restores dopamine sensitivity\u2014and with it, the natural drive to pursue meaningful goals." },
-            { heading: "Financial Impact", body: "Beyond direct costs (subscriptions, premium content), there are indirect costs: lost productivity, therapy expenses, relationship counseling, and in severe cases, legal fees. Recognizing the full financial impact can be a powerful motivator for change." }
+            { heading: "Time and Energy Drain", body: "Compulsive porn use consumes enormous amounts of time\u2014not just the act itself, but the mental energy of anticipation, searching, and post-consumption shame. Users report losing 1\u20133 hours per day to the cycle. Over a year, that is 350\u20131,000 hours\u2014the equivalent of a part-time job or the time needed to learn a new language or master a skill." },
+            { heading: "Workplace Consequences", body: "Decreased concentration, missed deadlines, and risky behavior (viewing at work) are common. A survey by the American Academy of Matrimonial Lawyers found that porn use was cited as evidence in 56% of divorce cases, and workplace viewing was a factor in many employment terminations. The brain fog that accompanies compulsive use directly undermines professional performance." },
+            { heading: "Motivation and Goal Pursuit", body: "Dopamine is the brain\u2019s motivation chemical. When it\u2019s chronically depleted by hyper-stimulation, pursuing long-term goals feels unrewarding. This is why many compulsive users report a loss of ambition, procrastination, and a sense of \u201Cstuckness.\u201D Recovery restores dopamine sensitivity\u2014and with it, the natural drive to pursue meaningful goals returns, often surprisingly quickly." },
+            { heading: "The Opportunity Cost", body: "Beyond direct costs (subscriptions, premium content), there are indirect costs: lost productivity, therapy expenses, relationship counseling, and in severe cases, legal fees. But the biggest cost is invisible\u2014the opportunity cost. Every hour and every unit of mental energy spent on the cycle is stolen from the life you could be building: the skills, relationships, and achievements that never happened." }
           ],
-          reflection: "For one week, track the time and energy spent on compulsive behaviors. Then imagine redirecting that energy toward one meaningful goal\u2014learning a skill, building a project, or investing in a relationship."
+          reflection: "For one week, honestly track the time and mental energy spent on compulsive behaviors. Then imagine redirecting that energy toward one meaningful goal\u2014learning a skill, building a project, or investing in a relationship. What could you accomplish in a year with that reclaimed time?"
         },
-        { id: "ch2-l5", title: "Long-term Neurological Changes", duration: "1 min", status: "locked",
+        { id: "ch2-l5", title: "Long-term Neurological Changes", duration: "3 min", status: "locked",
           sections: [
-            { heading: "Brain Structure Changes", body: "Chronic compulsive porn use is associated with measurable changes in brain structure: reduced gray matter in the prefrontal cortex (decision-making), altered white matter connectivity (communication between brain regions), and shrinkage of the nucleus accumbens (reward processing). These changes are visible on MRI scans and correlate with years of compulsive use." },
-            { heading: "Epigenetic Effects", body: "Emerging research suggests that chronic addiction can alter gene expression through epigenetic mechanisms\u2014changes that don\u2019t modify DNA but affect how genes are \u201Cread.\u201D These changes can affect stress response, impulse control, and even be passed to offspring. The encouraging news: recovery can reverse many of these epigenetic marks." },
-            { heading: "Memory and Learning Impairment", body: "The hippocampus\u2014critical for memory formation and learning\u2014is particularly vulnerable to chronic stress and dopamine dysregulation. Compulsive users often report forgetfulness, difficulty learning new information, and reduced cognitive flexibility. With sustained recovery, hippocampal neurogenesis (new neuron growth) resumes, improving memory within 6\u201312 weeks." },
-            { heading: "The Good News: Neuroplasticity", body: "The brain\u2019s ability to heal is remarkable. Studies show that 90 days of sustained abstinence leads to measurable recovery of prefrontal cortex volume, improved dopamine receptor sensitivity, and restored white matter connectivity. The brain that was changed by addiction can be changed again\u2014this time by recovery." }
+            { heading: "Brain Structure Changes", body: "Chronic compulsive porn use is associated with measurable changes in brain structure: reduced gray matter in the prefrontal cortex (decision-making), altered white matter connectivity (communication between brain regions), and reduced activity in the striatum (reward processing). These changes are visible on MRI scans and correlate with hours of use per week (K\u00FChn & Gallinat, 2014)." },
+            { heading: "Epigenetic Effects", body: "Emerging research suggests that chronic addiction can alter gene expression through epigenetic mechanisms\u2014changes that don\u2019t modify DNA but affect how genes are \u201Cread.\u201D These changes can affect stress response, impulse control, and reward sensitivity. The encouraging news: recovery and healthy behaviors can reverse many of these epigenetic marks over time." },
+            { heading: "Memory and Learning Impairment", body: "The hippocampus\u2014critical for memory formation and learning\u2014is particularly vulnerable to chronic stress and dopamine dysregulation. Compulsive users often report forgetfulness, difficulty learning new information, and reduced cognitive flexibility. With sustained recovery, hippocampal neurogenesis (new neuron growth) resumes, improving memory and learning capacity." },
+            { heading: "Understanding Neuroplasticity", body: "Neuroplasticity is the brain\u2019s ability to reorganize itself by forming new neural connections. It is the reason addiction is possible\u2014and the reason recovery is possible. The same mechanism that wired the addiction can rewire it. As the saying goes: \u201CNeurons that fire together, wire together.\u201D In recovery, you deliberately fire new, healthy circuits until they become the default." },
+            { heading: "The Good News: The Brain Heals", body: "The brain\u2019s ability to heal is remarkable. Studies and extensive self-report data show that sustained abstinence (often around 90 days) leads to measurable recovery of prefrontal cortex function, improved dopamine receptor sensitivity, and restored connectivity. The brain that was changed by addiction can be changed again\u2014this time by recovery. Time plus consistent new behavior equals healing." }
           ],
-          reflection: "Your brain is not permanently broken. Every day of recovery is a day your brain heals. Visualize your neural pathways rewiring\u2014like a forest path that grows over when it\u2019s no longer walked."
+          reflection: "Your brain is not permanently broken. Every day of recovery is a day your brain heals. Visualize your neural pathways rewiring\u2014like a well-worn forest path that slowly grows over when it\u2019s no longer walked, while a new, healthier path forms with each step you take."
         }
       ]
     },
     {
       id: "ch3", title: "Benefits of Quitting",
       lessons: [
-        { id: "ch3-l1", title: "Mental Clarity and Emotional Freedom", duration: "1 min", status: "completed",
+        { id: "ch3-l1", title: "Mental Clarity and Emotional Freedom", duration: "4 min", status: "completed",
           sections: [
-            { heading: "The Fog Lifts", body: "One of the most commonly reported benefits of quitting is mental clarity. Users describe the sensation of \u201Ca fog lifting\u201D\u2014suddenly they can think clearly, make decisions faster, and feel present in conversations. This typically begins within 2\u20133 weeks as dopamine receptors start to recalibrate." },
-            { heading: "Emotional Range Returns", body: "Compulsive porn use blunts emotions\u2014both negative and positive. When you quit, the full spectrum of emotion gradually returns. Music sounds richer, nature looks more beautiful, and genuine human connection feels deeply rewarding. This emotional restoration is one of the most motivating aspects of sustained recovery." },
+            { heading: "The Fog Lifts", body: "One of the most commonly reported benefits of quitting is mental clarity. Users describe the sensation of \u201Ca fog lifting\u201D\u2014suddenly they can think clearly, make decisions faster, and feel present in conversations. This typically begins within 2\u20133 weeks as dopamine receptors start to recalibrate and the prefrontal cortex regains function." },
+            { heading: "Emotional Range Returns", body: "Compulsive porn use blunts emotions\u2014both negative and positive. When you quit, the full spectrum of emotion gradually returns. Music sounds richer, nature looks more beautiful, and genuine human connection feels deeply rewarding. This emotional restoration is one of the most motivating aspects of sustained recovery, often called the \u201Creboot glow.\u201D" },
             { heading: "Reduced Anxiety", body: "As the brain\u2019s stress-response system normalizes, baseline anxiety levels drop significantly. Research shows a 35% reduction in generalized anxiety symptoms after 60 days of abstinence (B\u00F6the et al., 2021). The constant background tension of secrecy and shame also dissipates, replaced by a sense of integrity and self-respect." },
-            { heading: "Increased Self-Esteem", body: "Every day of recovery is evidence of personal strength. This builds genuine self-efficacy\u2014the belief that you can handle difficult things. Self-esteem shifts from being externally dependent (on validation, consumption) to internally grounded (on values, discipline, growth)." }
+            { heading: "Freedom From the Mental Loop", body: "Perhaps the most underrated benefit is freedom from the constant mental preoccupation\u2014the intrusive thoughts, the planning, the fantasizing, the after-the-fact regret. This mental \u201Cbandwidth\u201D returns to you. Many people are shocked by how much clearer and quieter their mind becomes when it is no longer running the addiction loop in the background." },
+            { heading: "Increased Self-Esteem", body: "Every day of recovery is evidence of personal strength. This builds genuine self-efficacy\u2014the belief that you can handle difficult things. Self-esteem shifts from being externally dependent (on validation, consumption) to internally grounded (on values, discipline, growth). You start to trust yourself again." }
           ],
-          reflection: "Imagine yourself 30 days from now\u2014clearer mind, steadier emotions, deeper connections. What does that version of you look like? What would they say to you right now?"
+          reflection: "Imagine yourself 30 days from now\u2014clearer mind, steadier emotions, deeper connections, a quieter mental space. What does that version of you look like? What would they say to you right now, at the start of the journey?"
         },
-        { id: "ch3-l2", title: "Improved Physical Health and Vitality", duration: "1 min", status: "current",
+        { id: "ch3-l2", title: "Improved Physical Health and Vitality", duration: "3 min", status: "current",
           sections: [
             { heading: "Energy Restoration", body: "Quitting porn often leads to a significant boost in physical energy. The time previously consumed by the addiction cycle (1\u20133 hours daily) is reclaimed for exercise, sleep, and productive activities. Combined with improved sleep quality, users report feeling more vital and physically capable within weeks." },
-            { heading: "Hormonal Rebalancing", body: "Chronic porn use can disrupt hormonal balance, particularly testosterone and cortisol patterns. Studies suggest that 7 days of abstinence from ejaculation can increase testosterone levels by up to 45% (Jiang et al., 2003). While the direct effects are debated, many users report increased confidence, drive, and physical presence." },
-            { heading: "Better Sleep", body: "Removing late-night screen time and dopamine stimulation dramatically improves sleep quality. Deep sleep increases, leading to better physical recovery, immune function, and cognitive performance. Users often report falling asleep faster and waking more refreshed." },
-            { heading: "Physical Confidence", body: "As sexual dysfunction improves (typically within 4\u20138 weeks), physical confidence returns. The combination of better erections, increased sensitivity, and restored natural arousal patterns contributes to overall physical well-being and self-assurance." }
+            { heading: "Hormonal Rebalancing", body: "Chronic porn use can disrupt hormonal balance, particularly testosterone and cortisol patterns. Studies suggest that a short period of abstinence from ejaculation can temporarily increase testosterone levels (Jiang et al., 2003). While the direct effects are debated, many users report increased confidence, drive, and physical presence during recovery." },
+            { heading: "Better Sleep", body: "Removing late-night screen time and dopamine stimulation dramatically improves sleep quality. Deep sleep increases, leading to better physical recovery, immune function, and cognitive performance. Users often report falling asleep faster and waking more refreshed\u2014which then improves mood, focus, and willpower the following day." },
+            { heading: "Physical Confidence", body: "As sexual dysfunction improves (typically within 4\u20138 weeks), physical confidence returns. The combination of better erections, increased sensitivity, and restored natural arousal patterns contributes to overall physical well-being and self-assurance. This often creates a positive feedback loop with exercise and self-care." }
           ],
-          reflection: "What could you do with an extra hour each day? List three physical activities that excite you\u2014running, martial arts, dancing, hiking\u2014and commit to trying one this week."
+          reflection: "What could you do with an extra hour each day and more energy to spend it? List three physical activities that genuinely excite you\u2014running, martial arts, dancing, hiking, lifting\u2014and commit to trying one this week."
         },
-        { id: "ch3-l3", title: "Rebuilding Healthy Relationships", duration: "1 min", status: "locked",
+        { id: "ch3-l3", title: "Rebuilding Healthy Relationships", duration: "3 min", status: "locked",
           sections: [
             { heading: "Presence and Availability", body: "When you\u2019re no longer mentally preoccupied with the addiction cycle, you become truly present for the people in your life. Conversations deepen, eye contact becomes natural, and emotional availability increases. Partners, friends, and family notice the change\u2014often before you do." },
-            { heading: "Authentic Intimacy", body: "Recovery allows genuine intimacy to develop\u2014built on vulnerability, trust, and mutual respect rather than performance or fantasy. This applies to romantic relationships and all human connections. Many people in recovery report forming their deepest friendships during this period." },
-            { heading: "Communication Skills", body: "The practice of honest self-reflection and accountability (core to recovery) naturally improves communication skills. You become better at expressing needs, listening actively, and navigating conflict without avoidance or emotional shutdown." },
-            { heading: "Attraction and Romance", body: "As confidence, energy, and emotional availability increase, many people find that their romantic lives improve dramatically. The ability to be genuinely attracted to a real partner\u2014rather than a screen\u2014is one of the most rewarding aspects of sustained recovery." }
+            { heading: "Authentic Intimacy", body: "Recovery allows genuine intimacy to develop\u2014built on vulnerability, trust, and mutual respect rather than performance or fantasy. This applies to romantic relationships and all human connections. Many people in recovery report forming their deepest friendships during this period, precisely because they show up as their real selves." },
+            { heading: "Communication Skills", body: "The practice of honest self-reflection and accountability (core to recovery) naturally improves communication skills. You become better at expressing needs, listening actively, and navigating conflict without avoidance or emotional shutdown\u2014skills that strengthen every relationship you have." },
+            { heading: "Attraction and Romance", body: "As confidence, energy, and emotional availability increase, many people find that their romantic lives improve dramatically. The ability to be genuinely attracted to a real partner\u2014rather than a screen\u2014is one of the most rewarding aspects of sustained recovery. Real intimacy becomes not a pale substitute, but the richest experience available." }
           ],
           reflection: "Think of one relationship in your life that matters most. What would change if you were fully present and emotionally available? Take one small step toward that today\u2014a genuine conversation, a shared activity, or simply undivided attention."
         },
-        { id: "ch3-l4", title: "Increased Confidence and Self-Esteem", duration: "1 min", status: "locked",
+        { id: "ch3-l4", title: "Increased Confidence and Self-Esteem", duration: "3 min", status: "locked",
           sections: [
             { heading: "The Confidence-Competence Loop", body: "Every challenge you face in recovery builds competence\u2014and competence builds confidence. Each urge resisted, each trigger managed, each day completed strengthens the belief that you are capable. This confidence generalizes beyond recovery into work, relationships, and personal goals." },
-            { heading: "Values Alignment", body: "Addiction creates a gap between your values and your behavior\u2014and that gap generates shame. Recovery closes the gap. When your actions align with your values, self-respect naturally follows. You no longer need to \u201Chide\u201D from yourself." },
+            { heading: "Values Alignment", body: "Addiction creates a gap between your values and your behavior\u2014and that gap generates shame. Recovery closes the gap. When your actions align with your values, self-respect naturally follows. You no longer need to \u201Chide\u201D from yourself, and that inner integrity is the foundation of authentic confidence." },
             { heading: "Social Confidence", body: "Without the weight of secrecy, social interactions become lighter and more authentic. Many recovering individuals report improved eye contact, reduced social anxiety, and a natural ability to connect with others. This is partly neurological (restored dopamine function) and partly psychological (reduced shame)." },
-            { heading: "Identity Reconstruction", body: "Addiction narrows identity\u2014you become \u201Csomeone who has this problem.\u201D Recovery expands identity\u2014you become someone who overcame, who grew, who chose differently. This expanded identity is more resilient and more attractive to others." }
+            { heading: "Identity Reconstruction", body: "Addiction narrows identity\u2014you become \u201Csomeone who has this problem.\u201D Recovery expands identity\u2014you become someone who overcame, who grew, who chose differently. This expanded identity is more resilient and more attractive to others. You are no longer defined by what you\u2019re trying to stop, but by what you\u2019re building." }
           ],
-          reflection: "Complete this sentence: \u201CI am the kind of person who...\u201D Write three versions\u2014one about your character, one about your goals, one about your relationships. These are the foundations of your new identity."
+          reflection: "Complete this sentence three ways: \u201CI am the kind of person who...\u201D\u2014one about your character, one about your goals, one about your relationships. These statements are the foundations of your new identity. Revisit them often."
         },
-        { id: "ch3-l5", title: "Rediscovering Purpose and Meaning", duration: "1 min", status: "locked",
+        { id: "ch3-l5", title: "Rediscovering Purpose and Meaning", duration: "3 min", status: "locked",
           sections: [
-            { heading: "Beyond Abstinence", body: "Recovery is not just about stopping a behavior\u2014it\u2019s about building a life worth living. Purpose provides the \u201Cwhy\u201D that sustains the \u201Chow.\u201D Research shows that individuals with a clear sense of purpose are 3x more likely to maintain long-term recovery (Hill et al., 2018)." },
-            { heading: "Post-Traumatic Growth", body: "Many people discover that their struggle with addiction becomes a catalyst for profound personal growth. They develop empathy, resilience, self-awareness, and compassion that they might not have cultivated otherwise. This is called post-traumatic growth\u2014and it\u2019s a well-documented phenomenon in psychology." },
-            { heading: "Contribution and Service", body: "One of the most powerful aspects of recovery is the ability to help others. Sharing your experience\u2014in support groups, online communities, or mentoring\u2014reinforces your own recovery while giving your journey meaning. Service transforms suffering into contribution." },
-            { heading: "Building Your Vision", body: "What does a meaningful life look like for you? Not a life without urges or challenges, but one where you\u2019re growing, connecting, and contributing. Recovery gives you the clarity and energy to pursue that vision\u2014one day at a time." }
+            { heading: "Beyond Abstinence", body: "Recovery is not just about stopping a behavior\u2014it\u2019s about building a life worth living. Purpose provides the \u201Cwhy\u201D that sustains the \u201Chow.\u201D Research shows that individuals with a clear sense of purpose are 3x more likely to maintain long-term recovery (Hill et al., 2018). Abstinence removes something; purpose adds something in its place." },
+            { heading: "Post-Traumatic Growth", body: "Many people discover that their struggle with addiction becomes a catalyst for profound personal growth. They develop empathy, resilience, self-awareness, and compassion that they might not have cultivated otherwise. This is called post-traumatic growth\u2014and it\u2019s a well-documented phenomenon in psychology. Your struggle can become your greatest teacher." },
+            { heading: "Contribution and Service", body: "One of the most powerful aspects of recovery is the ability to help others. Sharing your experience\u2014in support groups, online communities, or mentoring\u2014reinforces your own recovery while giving your journey meaning. Service transforms suffering into contribution, and pain into purpose." },
+            { heading: "Building Your Vision", body: "What does a meaningful life look like for you? Not a life without urges or challenges, but one where you\u2019re growing, connecting, and contributing. Recovery gives you the clarity and energy to pursue that vision\u2014one day at a time. The goal is not merely to quit porn, but to become the person you were always capable of being." }
           ],
-          reflection: "Write your \u201Crecovery vision statement\u201D: In one year, my life will look like ___. I will be known for ___. I will have contributed ___. Post this somewhere you\u2019ll see it daily."
+          reflection: "Write your \u201Crecovery vision statement\u201D: In one year, my life will look like ___. I will be known for ___. I will have contributed ___. Post this somewhere you\u2019ll see it daily\u2014it turns abstract motivation into a concrete destination."
         }
       ]
     },
     {
       id: "ch4", title: "Recovery Strategies",
       lessons: [
-        { id: "ch4-l1", title: "The Neurobiology of Recovery\u2014How the Brain Rebuilds", duration: "1 min", status: "completed",
+        { id: "ch4-l1", title: "The Neurobiology of Recovery\u2014How the Brain Rebuilds", duration: "4 min", status: "completed",
           sections: [
             { heading: "Dopamine Reset", body: "Chronic porn use desensitizes dopamine receptors. During early recovery, dopamine sensitivity gradually returns over 3\u20136 weeks, reducing cravings and increasing reward responsiveness to natural stimuli (e.g., social connection, physical activity). The first two weeks are the hardest\u2014your brain is recalibrating. Expect irritability, boredom, and flat mood. These are signs of healing, not failure." },
+            { heading: "The Flatline", body: "Many people in recovery experience a \u201Cflatline\u201D\u2014a period (often weeks 2\u20136) of low libido, low mood, and low motivation. This is not a sign that something is wrong; it is the brain rebalancing after chronic overstimulation. The flatline is temporary and typically resolves into renewed energy and clarity. Knowing it\u2019s coming helps you ride it out instead of panicking." },
             { heading: "Prefrontal Cortex Restoration", body: "Impulse control and decision-making rely on the prefrontal cortex, which is impaired during active addiction. With consistent abstinence and mindfulness practice, gray matter volume increases measurably within 8 weeks (K\u00FChn & Gallinat, 2014). Activities that strengthen the PFC include: meditation, learning new skills, strategic games (chess, puzzles), and deliberate cold exposure." },
-            { heading: "Stress Response Regulation", body: "The amygdala becomes hyper-reactive in addiction\u2014everything feels more stressful and urgent. Recovery involves strengthening the hippocampus\u2019 ability to modulate fear and stress responses through breathwork, grounding techniques, and sleep hygiene. The 4-7-8 breathing technique (inhale 4s, hold 7s, exhale 8s) activates the parasympathetic nervous system within 60 seconds." },
-            { heading: "The Timeline of Brain Healing", body: "Week 1\u20132: Acute withdrawal (irritability, strong cravings, poor sleep). Week 3\u20134: Dopamine begins to stabilize (mood improves, cravings become less frequent). Week 5\u20138: PFC function improves (better focus, impulse control). Week 9\u201312: Neural pathways significantly rewired (natural rewards feel satisfying again). Week 12+: Consolidation phase (new patterns become automatic)." }
+            { heading: "Stress Response Regulation", body: "The amygdala becomes hyper-reactive in addiction\u2014everything feels more stressful and urgent. Recovery involves strengthening the brain\u2019s ability to modulate fear and stress responses through breathwork, grounding techniques, and sleep hygiene. The 4-7-8 breathing technique (inhale 4s, hold 7s, exhale 8s) activates the parasympathetic nervous system within 60 seconds\u2014a tool you can use in any urge moment." },
+            { heading: "The Timeline of Brain Healing", body: "Week 1\u20132: Acute withdrawal (irritability, strong cravings, poor sleep). Week 3\u20134: Dopamine begins to stabilize (mood improves, cravings become less frequent). Week 5\u20138: PFC function improves (better focus, impulse control). Week 9\u201312: Neural pathways significantly rewired (natural rewards feel satisfying again). Week 12+: Consolidation phase (new patterns become automatic). Everyone\u2019s timeline differs\u2014the direction matters more than the exact dates." }
           ],
-          reflection: "What small, daily action can you take this week to support your brain\u2019s healing process? Example: 5 minutes of deep breathing before bed, or walking outside for 10 minutes without phone use."
+          reflection: "What small, daily action can you take this week to support your brain\u2019s healing process? Example: 5 minutes of deep breathing before bed, or a 10-minute walk outside without your phone. Small, consistent actions rewire the brain more effectively than occasional big efforts."
         },
-        { id: "ch4-l2", title: "Cognitive Behavioral Tools for Breaking the Cycle", duration: "1 min", status: "current",
+        { id: "ch4-l2", title: "Cognitive Behavioral Tools for Breaking the Cycle", duration: "4 min", status: "current",
           sections: [
             { heading: "Thought Records", body: "CBT\u2019s most powerful tool is the thought record. When an urge strikes, write down: (1) The Situation\u2014where are you, what happened? (2) The Automatic Thought\u2014what is your brain telling you? (3) The Emotion\u2014what are you feeling? (4) The Rational Response\u2014what would a wise friend say? (5) The Outcome\u2014how do you feel now? This process creates space between trigger and response." },
-            { heading: "Cognitive Distortions", body: "Addiction thrives on distorted thinking. Common patterns include: All-or-Nothing (\u201CI already slipped, might as well go all the way\u201D), Minimization (\u201CJust one peek won\u2019t hurt\u201D), and Emotional Reasoning (\u201CI feel bad, so I deserve relief\u201D). Learning to identify and challenge these distortions weakens their power." },
-            { heading: "Implementation Intentions", body: "Instead of vague willpower (\u201CI\u2019ll try to resist\u201D), create specific if-then plans: \u201CIf I feel the urge at night, then I will immediately do 20 push-ups and take a cold shower.\u201D Research by Peter Gollwitzer shows that implementation intentions increase follow-through by 2\u20133x compared to motivation alone (Gollwitzer, 1999)." },
-            { heading: "Behavioral Experiments", body: "Test your beliefs through action. If you believe \u201CI can\u2019t sleep without it,\u201D run a 3-day experiment: no consumption before bed, and track sleep quality. Most people discover their fears are exaggerated\u2014and this evidence-based confidence grows with each successful experiment." }
+            { heading: "Cognitive Distortions", body: "Addiction thrives on distorted thinking. Common patterns include: All-or-Nothing (\u201CI already slipped, might as well go all the way\u201D), Minimization (\u201CJust one peek won\u2019t hurt\u201D), Permission-Giving (\u201CI\u2019ve had a hard day, I deserve it\u201D), and Emotional Reasoning (\u201CI feel bad, so I deserve relief\u201D). Learning to identify and challenge these distortions weakens their power over you." },
+            { heading: "Implementation Intentions", body: "Instead of vague willpower (\u201CI\u2019ll try to resist\u201D), create specific if-then plans: \u201CIf I feel the urge at night, then I will immediately do 20 push-ups and take a cold shower.\u201D Research by Peter Gollwitzer shows that implementation intentions increase follow-through by 2\u20133x compared to motivation alone (Gollwitzer, 1999). Pre-deciding removes the need to negotiate with yourself in the vulnerable moment." },
+            { heading: "Behavioral Experiments", body: "Test your beliefs through action. If you believe \u201CI can\u2019t sleep without it,\u201D run a 3-day experiment: no consumption before bed, and track sleep quality. Most people discover their fears are exaggerated\u2014and this evidence-based confidence grows with each successful experiment." },
+            { heading: "Cognitive Defusion", body: "From ACT (Acceptance and Commitment Therapy): you are not your thoughts. When an urge-thought appears, instead of \u201CI need this,\u201D try labeling it: \u201CI\u2019m having the thought that I need this.\u201D This small linguistic shift creates distance and reminds you that a thought is just a thought\u2014not a command you must obey." }
           ],
-          reflection: "Create three if-then plans for your most common triggers. Write them down and keep them accessible. Example: \u201CIf I feel bored and reach for my phone, then I will open my journal app instead and write for 2 minutes.\u201D"
+          reflection: "Create three if-then plans for your most common triggers. Write them down and keep them accessible on your phone. Example: \u201CIf I feel bored and reach for my phone, then I will open my journal app and write for 2 minutes instead.\u201D"
         },
-        { id: "ch4-l3", title: "Building a Relapse-Resistant Environment", duration: "1 min", status: "locked",
+        { id: "ch4-l3", title: "Building a Relapse-Resistant Environment", duration: "4 min", status: "locked",
           sections: [
-            { heading: "Digital Architecture", body: "Your digital environment should make the unwanted behavior difficult and the desired behavior easy. Install content blockers on all devices. Remove social media apps that serve as gateways. Use grayscale mode on your phone to reduce visual stimulation. Charge devices outside the bedroom. These are not crutches\u2014they are smart design." },
-            { heading: "Physical Environment", body: "Your physical space should support recovery. Keep your bedroom for sleep only (no screens). Create a dedicated \u201Crecovery corner\u201D\u2014a comfortable space for journaling, reading, or meditation. Fill your environment with visual reminders of your goals (vision board, written reasons, progress tracker)." },
-            { heading: "Time Architecture", body: "Unstructured time is the enemy of recovery. Plan your days with intention\u2014especially high-risk times (late evening, early morning, weekends). Use time-blocking to create structure. Schedule exercise, social activities, and creative pursuits during your most vulnerable hours." },
+            { heading: "Willpower Is Not Enough", body: "A crucial mindset shift: relying on willpower alone is a losing strategy. Willpower is a limited resource that depletes throughout the day (ego depletion). The most successful people in recovery don\u2019t have more willpower\u2014they design environments that require less of it. Make the unwanted behavior hard and the wanted behavior easy." },
+            { heading: "Digital Architecture", body: "Your digital environment should make the unwanted behavior difficult and the desired behavior easy. Install content blockers on all devices. Remove social media apps that serve as gateways. Use grayscale mode on your phone to reduce visual stimulation. Charge devices outside the bedroom. These are not crutches\u2014they are smart design that buys you time and friction in the critical moment." },
+            { heading: "Physical Environment", body: "Your physical space should support recovery. Keep your bedroom for sleep only (no screens). Create a dedicated \u201Crecovery corner\u201D\u2014a comfortable space for journaling, reading, or meditation. Fill your environment with visual reminders of your goals (vision board, written reasons, progress tracker). Never use devices alone in a locked room late at night\u2014the highest-risk scenario." },
+            { heading: "Time Architecture", body: "Unstructured time is the enemy of recovery. Plan your days with intention\u2014especially high-risk times (late evening, early morning, weekends). Use time-blocking to create structure. Schedule exercise, social activities, and creative pursuits during your most vulnerable hours. Boredom is a major relapse trigger; a full, engaging schedule is powerful protection." },
             { heading: "Social Architecture", body: "Surround yourself with people who support your recovery. Reduce contact with people or groups that normalize compulsive behavior. Join recovery communities (online or in-person). Consider an accountability partner\u2014someone you check in with daily. Research shows that social accountability increases success rates by 65% (Gollwitzer & Oettingen, 2015)." }
           ],
-          reflection: "Audit your environment right now. List three things in your physical or digital space that make the unwanted behavior easier. Then list three changes you could make today to reverse that."
+          reflection: "Audit your environment right now. List three things in your physical or digital space that make the unwanted behavior easier. Then list three concrete changes you could make today to reverse them\u2014and do at least one before you sleep tonight."
         },
-        { id: "ch4-l4", title: "Support Systems and Accountability Partners", duration: "1 min", status: "locked",
+        { id: "ch4-l4", title: "Support Systems and Accountability Partners", duration: "3 min", status: "locked",
           sections: [
-            { heading: "Why Connection Heals", body: "Addiction thrives in isolation. Connection is the opposite of addiction\u2014not just abstinence, but belonging. Research consistently shows that social support is the single strongest predictor of sustained recovery, more powerful than willpower, therapy, or medication (Kelly et al., 2020)." },
-            { heading: "Finding Your People", body: "Support can come from many sources: 12-step programs (SA, SAA), online communities (NoFap, YourBrainOnPorn forums), therapy groups, faith communities, or recovery apps (Brainbuddy, Covenant Eyes). The key is consistency\u2014regular contact with people who understand your struggle and celebrate your progress." },
-            { heading: "Accountability Partners", body: "An accountability partner is someone you trust with your goals and check in with regularly. Effective accountability includes: daily check-ins (even brief), honest reporting of urges and slips, mutual encouragement, and shared strategies. Apps like Covenant Eyes or Accountable2You provide automated accountability through usage reports." },
-            { heading: "Professional Support", body: "Therapy provides tools that peer support alone cannot. Certified Sex Addiction Therapists (CSAT) offer specialized treatment. Modalities include: CBT (cognitive restructuring), EMDR (for underlying trauma), ACT (acceptance and commitment therapy), and somatic therapy (body-based healing). If cost is a barrier, many therapists offer sliding scales, and some recovery organizations provide free counseling." }
+            { heading: "Why Connection Heals", body: "Addiction thrives in isolation. Connection is the opposite of addiction\u2014not just abstinence, but belonging. Research consistently shows that social support is the single strongest predictor of sustained recovery, more powerful than willpower, therapy, or medication (Kelly et al., 2020). You cannot think your way out of a problem you behaved your way into\u2014but connection can pull you out." },
+            { heading: "Finding Your People", body: "Support can come from many sources: 12-step programs (SA, SAA), online communities (NoFap, r/pornfree, recovery forums), therapy groups, faith communities, or recovery apps. The key is consistency\u2014regular contact with people who understand your struggle and celebrate your progress. You don\u2019t need many; even one honest connection changes everything." },
+            { heading: "Accountability Partners", body: "An accountability partner is someone you trust with your goals and check in with regularly. Effective accountability includes: daily check-ins (even brief), honest reporting of urges and slips, mutual encouragement, and shared strategies. Apps like Covenant Eyes or Accountable2You provide automated accountability through usage reports\u2014removing the option to hide." },
+            { heading: "Professional Support", body: "Therapy provides tools that peer support alone cannot. Certified Sex Addiction Therapists (CSAT) offer specialized treatment. Modalities include: CBT (cognitive restructuring), EMDR (for underlying trauma), ACT (acceptance and commitment therapy), and somatic therapy (body-based healing). If cost is a barrier, many therapists offer sliding scales, and some recovery organizations provide free counseling." },
+            { heading: "Overcoming the Fear of Reaching Out", body: "The hardest part is the first step\u2014the fear of judgment. But remember: the people in recovery communities have been exactly where you are. Vulnerability is met with understanding, not condemnation. The relief of finally speaking your secret out loud, and being accepted anyway, is often a turning point in recovery." }
           ],
-          reflection: "Who is one person you could reach out to today\u2014a friend, therapist, or community member\u2014who could support your recovery? Taking the step to connect is an act of courage."
+          reflection: "Who is one person you could reach out to this week\u2014a friend, therapist, or community member\u2014who could support your recovery? Reaching out is not weakness; it is one of the bravest and most strategic moves you can make."
         },
-        { id: "ch4-l5", title: "Creating Your Personal Recovery Blueprint", duration: "1 min", status: "locked",
+        { id: "ch4-l5", title: "Creating Your Personal Recovery Blueprint", duration: "4 min", status: "locked",
           sections: [
             { heading: "Your Recovery Identity", body: "Sustainable recovery requires an identity shift\u2014from \u201Csomeone trying to stop\u201D to \u201Csomeone who lives differently.\u201D This is not about perfection; it\u2019s about direction. Every day you choose recovery, you reinforce this new identity. Ask yourself: Who do I want to become? What values do I want to embody?" },
-            { heading: "The Daily Practice", body: "Recovery is built in daily micro-habits: Morning routine (meditation, journaling, exercise). Trigger management (awareness, environment, replacement). Evening wind-down (no screens 1 hour before bed, gratitude practice, reading). Weekly review (progress assessment, plan adjustment, connection with support). These practices compound over time." },
-            { heading: "Handling Setbacks", body: "Relapse is not failure\u2014it\u2019s information. When a setback occurs: (1) Don\u2019t spiral into shame. (2) Analyze what happened\u2014what trigger, what thought pattern, what environmental factor? (3) Adjust your plan. (4) Reconnect with support immediately. (5) Restart your streak the same day, not tomorrow. Research shows that people who respond to setbacks with self-compassion and strategic adjustment recover faster than those who rely on willpower alone." },
+            { heading: "The Daily Practice", body: "Recovery is built in daily micro-habits: Morning routine (meditation, journaling, exercise). Trigger management (awareness, environment, replacement). Evening wind-down (no screens 1 hour before bed, gratitude practice, reading). Weekly review (progress assessment, plan adjustment, connection with support). These small practices compound powerfully over time." },
+            { heading: "Handling Setbacks", body: "Relapse is not failure\u2014it\u2019s information. When a setback occurs: (1) Don\u2019t spiral into shame. (2) Analyze what happened\u2014what trigger, what thought pattern, what environmental factor? (3) Adjust your plan. (4) Reconnect with support immediately. (5) Restart your streak the same day, not tomorrow. Research shows that people who respond to setbacks with self-compassion and strategic adjustment recover faster than those who rely on self-punishment." },
+            { heading: "The Abstinence Violation Effect", body: "Beware the \u201Cwhat-the-hell effect\u201D: after one slip, people often think \u201CI\u2019ve already blown it, might as well continue.\u201D This single distortion turns a small slip into a full relapse. Recognizing it is your defense. One slip is one slip\u2014not a reason to abandon all your progress. Get back on track immediately." },
             { heading: "Your Blueprint", body: "Combine everything you\u2019ve learned into a personal blueprint: Your why (reasons for quitting). Your triggers and coping strategies. Your support system. Your daily practices. Your vision for the future. Write this down. Review it weekly. Update it as you grow. This is your roadmap\u2014and it\u2019s uniquely yours." }
           ],
-          reflection: "Take 10 minutes to draft your Personal Recovery Blueprint. Include: My top 3 reasons for change. My 3 biggest triggers and my plan for each. My daily non-negotiables. My support team. My 90-day vision. This document is your anchor."
+          reflection: "Take 10 minutes to draft your Personal Recovery Blueprint. Include: My top 3 reasons for change. My 3 biggest triggers and my plan for each. My daily non-negotiables. My support team. My 90-day vision. This document is your anchor\u2014return to it whenever you feel lost."
         }
       ]
     }
   ]
 };
 
+const COURSE_PROGRESS_KEY = "quittr-course-completed-v1";
+
+function loadCompletedLessons() {
+  const allLessons = courseData.chapters.flatMap((chapter) => chapter.lessons);
+  const defaults = allLessons.filter((lesson) => lesson.status === "completed").map((lesson) => lesson.id);
+  try {
+    const saved = JSON.parse(localStorage.getItem(COURSE_PROGRESS_KEY));
+    if (!Array.isArray(saved)) return defaults;
+    return [...new Set([...defaults, ...saved.filter((id) => allLessons.some((lesson) => lesson.id === id))])];
+  } catch {
+    return defaults;
+  }
+}
+
+function getCourseChapters(completedIds) {
+  const completed = new Set(completedIds);
+  return courseData.chapters.map((chapter) => {
+    const currentIndex = chapter.lessons.findIndex((lesson) => !completed.has(lesson.id));
+    return {
+      ...chapter,
+      lessons: chapter.lessons.map((lesson, index) => ({
+        ...lesson,
+        status: completed.has(lesson.id) ? "completed" : index === currentIndex ? "current" : "locked"
+      }))
+    };
+  });
+}
+
 const games = [
-  { title: "Memory Recall", icon: "brain", tone: "memory" },
-  { title: "Find It Fast", icon: "search", tone: "find" },
-  { title: "Word Scramble", icon: "letters", tone: "words" }
+  { id: "memory", title: "Memory Recall", icon: "brain", tone: "memory", blurb: "Flip and match the pairs to sharpen focus and interrupt the urge loop." },
+  { id: "find", title: "Find It Fast", icon: "search", tone: "find", blurb: "Spot the one that is different before the timer runs out." },
+  { id: "words", title: "Word Scramble", icon: "letters", tone: "words", blurb: "Rebuild empowering recovery words letter by letter." },
+  { id: "stroop", title: "Stroop Test", icon: "dot", tone: "stroop", blurb: "Name the ink color, not the word. Train your brain to override autopilot." },
+  { id: "math", title: "Math Blitz", icon: "bars", tone: "math", blurb: "Rapid-fire arithmetic to pull your attention back to the present." },
+  { id: "breath", title: "Breath Hold", icon: "wind", tone: "breath", blurb: "4-7-8 breathing cycles that calm your nervous system in under two minutes." }
+];
+
+const GAME_MAX_LEVEL = 5;
+const gameLevelConfigs = {
+  memory: [
+    { pairs: 4 }, { pairs: 5 }, { pairs: 6 }, { pairs: 7 }, { pairs: 8 }
+  ],
+  find: [
+    { goal: 4, time: 30 }, { goal: 5, time: 30 }, { goal: 6, time: 28 }, { goal: 7, time: 26 }, { goal: 8, time: 24 }
+  ],
+  words: [
+    { goal: 2, minLen: 4, maxLen: 5 }, { goal: 3, minLen: 5, maxLen: 6 }, { goal: 3, minLen: 6, maxLen: 7 }, { goal: 4, minLen: 7, maxLen: 8 }, { goal: 4, minLen: 8, maxLen: 10 }
+  ],
+  stroop: [
+    { rounds: 6, perRound: 3.5, allowedMiss: 2 }, { rounds: 8, perRound: 3, allowedMiss: 2 }, { rounds: 10, perRound: 2.6, allowedMiss: 2 }, { rounds: 12, perRound: 2.2, allowedMiss: 2 }, { rounds: 14, perRound: 1.9, allowedMiss: 2 }
+  ],
+  math: [
+    { goal: 6, time: 45, max: 20, ops: ["+", "-"] }, { goal: 8, time: 45, max: 30, ops: ["+", "-"] }, { goal: 10, time: 50, max: 12, ops: ["×"] }, { goal: 12, time: 60, max: 40, ops: ["+", "-", "×"] }, { goal: 14, time: 60, max: 60, ops: ["+", "-", "×", "÷"] }
+  ],
+  breath: [
+    { cycles: 3 }, { cycles: 4 }, { cycles: 5 }, { cycles: 6 }, { cycles: 8 }
+  ]
+};
+
+const GAME_LEVELS_KEY = "quittr-game-levels";
+function loadGameLevels() {
+  try { return JSON.parse(localStorage.getItem(GAME_LEVELS_KEY)) || {}; } catch { return {}; }
+}
+function getUnlockedLevel(gameId) {
+  const all = loadGameLevels();
+  return Math.min(Math.max(all[gameId] || 1, 1), GAME_MAX_LEVEL);
+}
+function unlockNextLevel(gameId, clearedLevel) {
+  if (clearedLevel >= GAME_MAX_LEVEL) return clearedLevel;
+  const all = loadGameLevels();
+  const next = Math.min(clearedLevel + 1, GAME_MAX_LEVEL);
+  if ((all[gameId] || 1) < next) {
+    all[gameId] = next;
+    try { localStorage.setItem(GAME_LEVELS_KEY, JSON.stringify(all)); } catch {}
+  }
+  return next;
+}
+
+const memoryDeck = ["\uD83E\uDDE0", "\uD83C\uDF31", "\u2B50", "\uD83D\uDD25", "\uD83C\uDF0A", "\uD83C\uDF08", "\uD83C\uDF1F", "\u26A1"];
+const findEmojiSets = [
+  ["\uD83D\uDE0A", "\uD83D\uDE04"], ["\uD83C\uDF33", "\uD83C\uDF32"], ["\uD83D\uDD35", "\uD83D\uDFE3"],
+  ["\u2B50", "\uD83C\uDF1F"], ["\uD83C\uDF4E", "\uD83C\uDF45"], ["\uD83D\uDC36", "\uD83D\uDC3A"]
+];
+const scrambleWords = ["CALM", "FOCUS", "STRONG", "CLARITY", "FREEDOM", "GROWTH", "RESOLVE", "BALANCE", "COURAGE", "CONTROL"];
+
+const stroopColors = [
+  { name: "RED", css: "#ff4d4d" },
+  { name: "GREEN", css: "#3ddc6a" },
+  { name: "BLUE", css: "#4da3ff" },
+  { name: "PURPLE", css: "#b06bff" },
+  { name: "ORANGE", css: "#ffab3d" }
 ];
 
 const leaderboardRows = [
@@ -528,8 +623,36 @@ function App() {
   const [communityPostDetail, setCommunityPostDetail] = useState(null);
   const [communityFilter, setCommunityFilter] = useState("new");
   const [activeSoundscape, setActiveSoundscape] = useState(null);
-  const [activeChapterIdx, setActiveChapterIdx] = useState(0);
-  const [activeLesson, setActiveLesson] = useState(null);
+  const [completedLessonIds, setCompletedLessonIds] = useState(loadCompletedLessons);
+  const [activeChapterIdx, setActiveChapterIdx] = useState(() => {
+    const index = getCourseChapters(completedLessonIds).findIndex((chapter) => chapter.lessons.some((lesson) => lesson.status === "current"));
+    return Math.max(0, index);
+  });
+  const [activeLessonId, setActiveLessonId] = useState(null);
+  const [activeGame, setActiveGame] = useState(null);
+  const [panicOpen, setPanicOpen] = useState(false);
+  const [gameFromPanic, setGameFromPanic] = useState(false);
+  const [gameReturnPage, setGameReturnPage] = useState("library");
+  const chat = useMeliusConversation(async (actions) => {
+    if (!actions.some((action) => action.type !== "game")) return;
+    const results = await Promise.allSettled([loadAnalytics(), loadJournalEntries(), loadReasons()]);
+    if (results[0].status === "fulfilled") setAnalytics(withClientLoadedAt(results[0].value));
+    if (results[1].status === "fulfilled") setJournalEntries(results[1].value);
+    if (results[2].status === "fulfilled") setReasons(results[2].value);
+  });
+  const courseChapters = getCourseChapters(completedLessonIds);
+  const allCourseLessons = courseChapters.flatMap((chapter) => chapter.lessons);
+  const activeLessonIndex = allCourseLessons.findIndex((lesson) => lesson.id === activeLessonId);
+  const activeLesson = allCourseLessons[activeLessonIndex] || null;
+  const nextLesson = activeLessonIndex >= 0 ? allCourseLessons[activeLessonIndex + 1] || null : null;
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COURSE_PROGRESS_KEY, JSON.stringify(completedLessonIds));
+    } catch {
+      // Keep learning available when browser storage is unavailable.
+    }
+  }, [completedLessonIds]);
 
   useEffect(() => {
     document.body.classList.toggle("modal-open", isPledgeOpen || isResetConfirmOpen || isRewireModalOpen);
@@ -544,7 +667,7 @@ function App() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [page]);
+  }, [page, activeLessonId]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setClockNow(Date.now()), 60 * 1000);
@@ -643,6 +766,27 @@ function App() {
       setIsRewireModalOpen(false);
       return;
     }
+    if (action === "panic") {
+      setPanicOpen(true);
+      return;
+    }
+    if (action === "panic close") {
+      setPanicOpen(false);
+      return;
+    }
+    if (action === "panic games") {
+      setPanicOpen(false);
+      setGameFromPanic(true);
+      setActiveGame(games[0]);
+      setPage("game");
+      return;
+    }
+    if (action === "panic relapsed") {
+      setPanicOpen(false);
+      setResetReview(createResetReview());
+      setPage("reset");
+      return;
+    }
     if (action === "urge") {
       setPage("urge");
       setUrgeFlow(createUrgeFlow());
@@ -703,6 +847,21 @@ function App() {
     }
     if (action === "new entry") {
       setPage("journal-entry");
+      return;
+    }
+    if (action === "journal") {
+      loadJournalEntries().then(setJournalEntries).catch(() => showToast("Could not load journal"));
+      setPage("journal");
+      return;
+    }
+    if (action.startsWith("melius game ")) {
+      const game = games.find((item) => item.id === action.slice("melius game ".length));
+      if (game) {
+        setGameReturnPage("melius");
+        setGameFromPanic(false);
+        setActiveGame(game);
+        setPage("game");
+      }
       return;
     }
     if (action === "reasons") {
@@ -796,18 +955,48 @@ function App() {
     }
     if (action.startsWith("course lesson ")) {
       const lessonId = action.slice("course lesson ".length);
-      for (const chapter of courseData.chapters) {
+      for (const [chapterIndex, chapter] of courseChapters.entries()) {
         const lesson = chapter.lessons.find((l) => l.id === lessonId);
-        if (lesson) {
-          setActiveLesson(lesson);
+        if (lesson && lesson.status !== "locked") {
+          setActiveChapterIdx(chapterIndex);
+          setActiveLessonId(lesson.id);
           setPage("lesson-detail");
           return;
         }
       }
       return;
     }
+    if (action === "lesson complete") {
+      if (activeLesson && activeLesson.status !== "locked") {
+        setCompletedLessonIds((ids) => ids.includes(activeLesson.id) ? ids : [...ids, activeLesson.id]);
+      }
+      return;
+    }
     if (action === "lesson back") {
       setPage("course");
+      return;
+    }
+    if (action === "games") {
+      setGameReturnPage("library");
+      setGameFromPanic(false);
+      setActiveGame(games[0]);
+      setPage("game");
+      return;
+    }
+    if (action.startsWith("game ")) {
+      const id = action.slice("game ".length);
+      if (id === "back") {
+        setPage(gameFromPanic ? "home" : gameReturnPage);
+        setGameFromPanic(false);
+        setActiveGame(null);
+        return;
+      }
+      const game = games.find((g) => g.id === id);
+      if (game) {
+        setGameReturnPage("library");
+        setActiveGame(game);
+        setPage("game");
+      }
       return;
     }
     if (action.endsWith(" soundscape")) {
@@ -860,7 +1049,7 @@ function App() {
     }
   }
 
-  const hidesBottomNav = ["streak-calendar", "urge", "reset", "reset-triggers", "reset-action", "reset-commit", "reset-final", "journal-entry", "reasons", "blocker", "post-detail", "create-post", "soundscape-player", "lesson-detail"].includes(page);
+  const hidesBottomNav = ["streak-calendar", "urge", "reset", "reset-triggers", "reset-action", "reset-commit", "reset-final", "journal-entry", "reasons", "blocker", "post-detail", "create-post", "soundscape-player", "lesson-detail", "game"].includes(page);
 
   return h(
     "main",
@@ -868,9 +1057,10 @@ function App() {
     page === "home" ? h(HomePage, { onAction: handleAction, journalEntries, analytics, clockNow }) : null,
     page === "analytics" ? h(AnalyticsPage, { analytics, activeTab, onTab: setActiveTab, onAction: handleAction }) : null,
     page === "streak-calendar" ? h(StreakCalendarPage, { analytics, clockNow, onBack: () => setPage("home") }) : null,
-    page === "library" ? h(LibraryPage, { onAction: handleAction }) : null,
+    page === "library" ? h(LibraryPage, { courseChapters, onAction: handleAction }) : null,
     page === "profile" ? h(ProfilePage, { onAction: handleAction }) : null,
-    page === "melius" ? h(MeliusChatPage, { onBack: () => setPage("analytics") }) : null,
+    page === "melius" ? h(MeliusChatPage, { chat, onAction: handleAction, onBack: () => setPage("analytics") }) : null,
+    page === "journal" ? h(JournalPage, { entries: journalEntries, onAction: handleAction, onBack: () => setPage("melius") }) : null,
     page === "urge" ? h(UrgeFlowPage, { flow: urgeFlow, onAction: handleAction }) : null,
     page === "reset" ? h(ResetRecoveryPage, { onAction: handleAction }) : null,
     page === "reset-triggers" ? h(ResetTriggersPage, { review: resetReview, onAction: handleAction }) : null,
@@ -884,12 +1074,14 @@ function App() {
     page === "post-detail" ? h(PostDetailPage, { post: communityPostDetail, onAction: handleAction, showToast, setPost: setCommunityPostDetail }) : null,
     page === "create-post" ? h(CreatePostPage, { onAction: handleAction, showToast }) : null,
     page === "soundscape-player" ? h(SoundscapePlayerPage, { soundscape: activeSoundscape, onBack: () => setPage("library") }) : null,
-    page === "course" ? h(CourseOverviewPage, { activeChapterIdx, setActiveChapterIdx, onAction: handleAction }) : null,
-    page === "lesson-detail" ? h(LessonDetailPage, { lesson: activeLesson, onAction: handleAction }) : null,
+    page === "course" ? h(CourseOverviewPage, { chapters: courseChapters, activeChapterIdx, setActiveChapterIdx, onAction: handleAction }) : null,
+    page === "lesson-detail" ? h(LessonDetailPage, { lesson: activeLesson, nextLesson, onAction: handleAction }) : null,
+    page === "game" ? h(GamePlayPage, { key: gameFromPanic ? "panic" : "library", game: activeGame, fromPanic: gameFromPanic, onSwitch: setActiveGame, onBack: () => { setPage(gameFromPanic ? "home" : gameReturnPage); setGameFromPanic(false); setActiveGame(null); } }) : null,
     hidesBottomNav ? null : h(BottomNav, { page, onNavigate: navigate }),
     isPledgeOpen ? h(PledgeModal, { onClose: () => setIsPledgeOpen(false), onAction: handleAction }) : null,
     isResetConfirmOpen ? h(ResetConfirmDialog, { onAction: handleAction }) : null,
     isRewireModalOpen ? h(RewireModal, { onAction: handleAction }) : null,
+    panicOpen ? h(PanicSheet, { onAction: handleAction }) : null,
     lastAction ? h("div", { className: "toast", role: "status" }, lastAction) : null
   );
 }
@@ -905,8 +1097,14 @@ function HomePage({ onAction, journalEntries, analytics, clockNow }) {
     const current = container ? container.querySelector(".milestone.is-current") : null;
     if (!container || !current) return;
 
-    const left = current.offsetLeft - container.clientWidth * 0.38;
-    container.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
+    const centerCurrent = () => {
+      const left = current.offsetLeft - container.offsetLeft + current.offsetWidth / 2 - container.clientWidth / 2;
+      container.scrollTo({ left: Math.max(0, left), behavior: "instant" });
+    };
+    centerCurrent();
+    const observer = new ResizeObserver(centerCurrent);
+    observer.observe(container);
+    return () => observer.disconnect();
   }, [currentMilestoneDay]);
 
   return h(
@@ -1399,7 +1597,16 @@ function AnalyticsStats({ stats }) {
   );
 }
 
-function LibraryPage({ onAction }) {
+function LibraryPage({ courseChapters, onAction }) {
+  const allLessons = courseChapters.flatMap((chapter) => chapter.lessons);
+  const currentIndex = allLessons.findIndex((lesson) => lesson.status === "current");
+  const startIndex = currentIndex < 0 ? Math.max(0, allLessons.length - 3) : Math.max(0, currentIndex - 1);
+  const lessons = allLessons.slice(startIndex, startIndex + 3).map((lesson) => ({
+    ...lesson,
+    tone: lesson.status,
+    status: lesson.status === "completed" ? "Completed" : lesson.status === "current" ? "Continue learning" : "Locked",
+    icon: lesson.status === "completed" ? "check-circle" : lesson.status === "current" ? "dot" : "lock"
+  }));
   return h(
     "section",
     { className: "library-page" },
@@ -1412,7 +1619,7 @@ function LibraryPage({ onAction }) {
       h("span", { className: "mountain-shape", "aria-hidden": "true" })
     ),
     h(LibraryHeader, { title: "Continue Lesson", subtitle: "Pick up exactly where you left off", action: "lessons", onAction }),
-    h("section", { className: "lesson-timeline", "aria-label": "Continue Lesson" }, lessons.map((item) => h(LessonItem, { key: item.title, item, onAction }))),
+    h("section", { className: "lesson-timeline", "aria-label": "Continue Lesson" }, lessons.map((item) => h(LessonItem, { key: item.id, item, onAction }))),
     h(LibraryHeader, { title: "Games", subtitle: "Defeat urges with cognitive exercises", action: "games", onAction }),
     h("section", { className: "games-row", "aria-label": "Games" }, games.map((item) => h(GameCard, { key: item.title, item, onAction }))),
     h(LibraryHeader, { title: "Leaderboard", action: "leaderboard", onAction }),
@@ -1535,17 +1742,17 @@ function SoundscapePlayerPage({ soundscape, onBack }) {
 function LessonItem({ item, onAction }) {
   return h(
     "button",
-    { className: `lesson-item ${item.tone}`, type: "button", onClick: () => onAction(item.title) },
+    { className: `lesson-item ${item.tone}`, type: "button", disabled: item.tone === "locked", onClick: () => onAction(`course lesson ${item.id}`) },
     h("span", { className: "lesson-step" }, h(Icon, { name: item.icon })),
     h("span", { className: "lesson-copy" }, h("strong", null, item.title), h("small", null, item.status)),
     item.tone === "current" ? h("span", { className: "lesson-next" }, h(Icon, { name: "chevron" })) : null
   );
 }
 
-function CourseOverviewPage({ activeChapterIdx, setActiveChapterIdx, onAction }) {
-  const chapter = courseData.chapters[activeChapterIdx];
-  const totalLessons = courseData.chapters.reduce((sum, ch) => sum + ch.lessons.length, 0);
-  const completedLessons = courseData.chapters.reduce((sum, ch) => sum + ch.lessons.filter((l) => l.status === "completed").length, 0);
+function CourseOverviewPage({ chapters, activeChapterIdx, setActiveChapterIdx, onAction }) {
+  const chapter = chapters[activeChapterIdx];
+  const totalLessons = chapters.reduce((sum, ch) => sum + ch.lessons.length, 0);
+  const completedLessons = chapters.reduce((sum, ch) => sum + ch.lessons.filter((l) => l.status === "completed").length, 0);
   const chapterCompleted = chapter.lessons.filter((l) => l.status === "completed").length;
   const chapterTotal = chapter.lessons.length;
   const progressPercent = chapterTotal > 0 ? (chapterCompleted / chapterTotal) * 100 : 0;
@@ -1565,7 +1772,7 @@ function CourseOverviewPage({ activeChapterIdx, setActiveChapterIdx, onAction })
       h("span", { className: "course-badge-progress" }, completedLessons, "/", totalLessons, " complete")
     ),
     h("nav", { className: "course-chapters", "aria-label": "Chapters" },
-      courseData.chapters.map((ch, idx) =>
+      chapters.map((ch, idx) =>
         h("button", {
           key: ch.id,
           className: `course-chapter-btn${idx === activeChapterIdx ? " is-active" : ""}`,
@@ -1622,10 +1829,9 @@ function CourseLessonCard({ lesson, index, onAction }) {
   );
 }
 
-function LessonDetailPage({ lesson, onAction }) {
-  const [marked, setMarked] = useState(lesson ? lesson.status === "completed" : false);
+function LessonDetailPage({ lesson, nextLesson, onAction }) {
   if (!lesson) return null;
-  const handleMark = () => { setMarked(true); };
+  const marked = lesson.status === "completed";
 
   return h(
     "section",
@@ -1653,15 +1859,598 @@ function LessonDetailPage({ lesson, onAction }) {
     ),
     h("div", { className: "lesson-page-footer" },
       marked
-        ? h("div", { className: "lesson-marked-done" }, h(Icon, { name: "check-circle" }), " Lesson Completed")
-        : h("button", { className: "lesson-mark-btn", type: "button", onClick: handleMark },
+        ? h(React.Fragment, null,
+            h("div", { className: "lesson-marked-done" }, h(Icon, { name: "check-circle" }), " Lesson Completed"),
+            h("button", { className: "lesson-mark-btn", type: "button", onClick: () => onAction(nextLesson ? `course lesson ${nextLesson.id}` : "lesson back") },
+              nextLesson ? "Next Lesson" : "Back to Lessons", h(Icon, { name: "chevron" }))
+          )
+        : h("button", { className: "lesson-mark-btn", type: "button", onClick: () => onAction("lesson complete") },
             h(Icon, { name: "check" }), " Mark as Complete")
     )
   );
 }
 
 function GameCard({ item, onAction }) {
-  return h("button", { className: `game-card ${item.tone}`, type: "button", onClick: () => onAction(item.title) }, h("span", null, h(Icon, { name: item.icon })), h("strong", null, item.title));
+  return h("button", { className: `game-card ${item.tone}`, type: "button", onClick: () => onAction(`game ${item.id}`) }, h("span", null, h(Icon, { name: item.icon })), h("strong", null, item.title));
+}
+
+function shuffleArray(input) {
+  const arr = input.slice();
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+  return arr;
+}
+
+function PanicSheet({ onAction }) {
+  const sideEffects = [
+    { icon: "bars", tone: "red", title: "Reduced Performance", body: "Not feeling physically responsive" },
+    { icon: "search", tone: "orange", title: "Desensitization", body: "Needing more extreme content for arousal." },
+    { icon: "heart", tone: "pink", title: "Relationship Issues", body: "Decreased intimacy and trust." },
+    { icon: "people", tone: "blue", title: "Social Isolation", body: "Withdrawal from social interactions." },
+    { icon: "brain", tone: "purple", title: "Distorted Perceptions of Sex", body: "Unrealistic expectations in relationships." }
+  ];
+  return h(
+    "div",
+    { className: "panic-overlay" },
+    h(
+      "div",
+      { className: "panic-sheet", role: "dialog", "aria-label": "Panic Button" },
+      h("button", { className: "icon-button panic-close", type: "button", onClick: () => onAction("panic close"), "aria-label": "Close panic sheet" }, h(Icon, { name: "close" })),
+      h("p", { className: "panic-brand" }, "QUITTR"),
+      h("h1", { className: "panic-title" }, "Panic Button"),
+      h("div", { className: "panic-orb-wrap" },
+        h("div", { className: "panic-orb" }),
+        h("span", { className: "panic-worth" }, "YOU'RE WORTH IT")
+      ),
+      h("div", { className: "panic-divider" }, h("span", null, "Side Effects of Relapsing")),
+      h("div", { className: "panic-effects" }, sideEffects.map((item) =>
+        h("div", { key: item.title, className: `panic-effect tone-${item.tone}` },
+          h("span", { className: "panic-effect-icon" }, h(Icon, { name: item.icon })),
+          h("div", { className: "panic-effect-copy" }, h("strong", null, item.title), h("small", null, item.body))
+        )
+      ))
+    ),
+    h("div", { className: "panic-actions" },
+      h("button", { className: "panic-relapsing", type: "button", onClick: () => onAction("panic games") }, h(Icon, { name: "warning" }), "I'm thinking of relapsing"),
+      h("button", { className: "panic-relapsed", type: "button", onClick: () => onAction("panic relapsed") }, "I Relapsed")
+    )
+  );
+}
+
+function GamePlayPage({ game, fromPanic, onSwitch, onBack }) {
+  const [level, setLevel] = useState(1);
+  const gameId = game ? game.id : "";
+  useEffect(() => {
+    if (gameId) setLevel(getUnlockedLevel(gameId));
+  }, [gameId]);
+  if (!game) return null;
+  const unlocked = getUnlockedLevel(game.id);
+  const handleClear = (clearedLevel) => {
+    const next = unlockNextLevel(game.id, clearedLevel);
+    setLevel(Math.min(next, GAME_MAX_LEVEL));
+  };
+  const renderGame = () => {
+    const key = `${game.id}-${level}`;
+    if (game.id === "memory") return h(MemoryRecallGame, { key, level, onClear: handleClear });
+    if (game.id === "find") return h(FindItFastGame, { key, level, onClear: handleClear });
+    if (game.id === "words") return h(WordScrambleGame, { key, level, onClear: handleClear });
+    if (game.id === "stroop") return h(StroopTestGame, { key, level, onClear: handleClear });
+    if (game.id === "math") return h(MathBlitzGame, { key, level, onClear: handleClear });
+    if (game.id === "breath") return h(BreathHoldGame, { key, level, onClear: handleClear });
+    return null;
+  };
+  return h("section", { className: `game-page ${game.tone}` },
+    h("header", { className: "game-header" },
+      h("button", { className: "icon-button", type: "button", onClick: onBack, "aria-label": "Back" }, h(Icon, { name: "chevron-left" })),
+      h("strong", null, fromPanic ? "Distraction Games" : "Games"),
+      h("span", { className: "game-header-spacer" })
+    ),
+    fromPanic ? h("p", { className: "game-panic-note" }, "Defeat the urge with these cognitive exercises") : null,
+    h("div", { className: "game-hero" },
+      h("span", { className: `game-hero-icon ${game.tone}` }, h(Icon, { name: game.icon })),
+      h("h1", null, game.title),
+      h("p", null, game.blurb)
+    ),
+    h("div", { className: "game-levels", role: "tablist", "aria-label": "Game levels" },
+      Array.from({ length: GAME_MAX_LEVEL }).map((_, i) => {
+        const n = i + 1;
+        const locked = n > unlocked;
+        return h("button", {
+          key: n,
+          type: "button",
+          disabled: locked,
+          className: `game-level${n === level ? " is-active" : ""}${locked ? " is-locked" : ""}${n < unlocked ? " is-done" : ""}`,
+          onClick: () => !locked && setLevel(n),
+          "aria-label": locked ? `Level ${n} locked` : `Level ${n}`
+        }, locked ? h(Icon, { name: "lock" }) : `Lv ${n}`);
+      })
+    ),
+    h("div", { className: "game-switch", role: "tablist" },
+      games.map((g) => h("button", {
+        key: g.id,
+        className: `game-switch-tab${g.id === game.id ? " is-active" : ""}`,
+        type: "button",
+        onClick: () => onSwitch(g)
+      }, g.title))
+    ),
+    renderGame()
+  );
+}
+
+function MemoryRecallGame({ level, onClear }) {
+  const cfg = gameLevelConfigs.memory[level - 1];
+  const buildCards = () => shuffleArray(memoryDeck.slice(0, cfg.pairs).flatMap((emoji) => [emoji, emoji])).map((emoji, idx) => ({ id: idx, emoji, flipped: false, matched: false }));
+  const [cards, setCards] = useState(buildCards);
+  const [picked, setPicked] = useState([]);
+  const [moves, setMoves] = useState(0);
+  const [locked, setLocked] = useState(false);
+  const timerRef = useRef(null);
+  const clearedRef = useRef(false);
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  const matchedCount = cards.filter((c) => c.matched).length;
+  const won = matchedCount === cards.length;
+
+  useEffect(() => {
+    if (won && !clearedRef.current) {
+      clearedRef.current = true;
+      onClear(level);
+    }
+  }, [won]);
+
+  const flip = (index) => {
+    if (locked) return;
+    const card = cards[index];
+    if (card.flipped || card.matched) return;
+    const nextCards = cards.map((c, i) => i === index ? { ...c, flipped: true } : c);
+    const nextPicked = picked.concat(index);
+    setCards(nextCards);
+    setPicked(nextPicked);
+    if (nextPicked.length === 2) {
+      setMoves((m) => m + 1);
+      const [a, b] = nextPicked;
+      if (nextCards[a].emoji === nextCards[b].emoji) {
+        setCards((cur) => cur.map((c, i) => (i === a || i === b) ? { ...c, matched: true } : c));
+        setPicked([]);
+      } else {
+        setLocked(true);
+        timerRef.current = setTimeout(() => {
+          setCards((cur) => cur.map((c, i) => (i === a || i === b) ? { ...c, flipped: false } : c));
+          setPicked([]);
+          setLocked(false);
+        }, 800);
+      }
+    }
+  };
+
+  const restart = () => { setCards(buildCards()); setPicked([]); setMoves(0); setLocked(false); clearedRef.current = false; };
+
+  return h("div", { className: "game-body" },
+    h("div", { className: "game-stats" },
+      h("span", null, h("small", null, "Level"), h("strong", null, level)),
+      h("span", null, h("small", null, "Moves"), h("strong", null, moves)),
+      h("span", null, h("small", null, "Matched"), h("strong", null, `${matchedCount / 2}/${cfg.pairs}`))
+    ),
+    won ? h("div", { className: "game-win" }, h(Icon, { name: "sparkles" }), h("strong", null, `Level ${level} cleared!`), h("span", null, `All ${cfg.pairs} pairs matched in ${moves} moves`), h("button", { className: "game-primary", type: "button", onClick: restart }, "Play again")) : null,
+    !won ? h("div", { className: "memory-grid", style: { gridTemplateColumns: "repeat(4, 1fr)" } },
+      cards.map((c, i) => h("button", {
+        key: c.id,
+        className: `memory-card${c.flipped || c.matched ? " is-open" : ""}${c.matched ? " is-matched" : ""}`,
+        type: "button",
+        onClick: () => flip(i),
+        "aria-label": c.flipped || c.matched ? c.emoji : "Hidden card"
+      }, h("span", { className: "memory-face" }, (c.flipped || c.matched) ? c.emoji : "?")))
+    ) : null,
+    !won ? h("button", { className: "game-restart", type: "button", onClick: restart }, h(Icon, { name: "undo" }), "Restart") : null
+  );
+}
+
+function FindItFastGame({ level, onClear }) {
+  const cfg = gameLevelConfigs.find[level - 1];
+  const [round, setRound] = useState(0);
+  const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(cfg.time);
+  const [running, setRunning] = useState(false);
+  const [won, setWon] = useState(false);
+  const [grid, setGrid] = useState(null);
+  const tickRef = useRef(null);
+
+  const buildRound = (r) => {
+    const set = findEmojiSets[Math.floor(Math.random() * findEmojiSets.length)];
+    const size = Math.min(3 + Math.floor(r / 2) + Math.floor((level - 1) / 2), 7);
+    const count = size * size;
+    const oddIndex = Math.floor(Math.random() * count);
+    return { base: set[0], odd: set[1], count, oddIndex, size };
+  };
+
+  const start = () => {
+    setScore(0);
+    setRound(0);
+    setTimeLeft(cfg.time);
+    setGrid(buildRound(0));
+    setWon(false);
+    setRunning(true);
+  };
+
+  useEffect(() => {
+    if (!running) return;
+    tickRef.current = setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) { clearInterval(tickRef.current); setRunning(false); return 0; }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(tickRef.current);
+  }, [running]);
+
+  const pick = (index) => {
+    if (!running || !grid) return;
+    if (index === grid.oddIndex) {
+      const nextScore = score + 1;
+      setScore(nextScore);
+      if (nextScore >= cfg.goal) {
+        setRunning(false);
+        setWon(true);
+        onClear(level);
+      } else {
+        const nextRound = round + 1;
+        setRound(nextRound);
+        setGrid(buildRound(nextRound));
+      }
+    } else {
+      setTimeLeft((t) => Math.max(0, t - 3));
+    }
+  };
+
+  const finished = !running && !won && timeLeft === 0;
+
+  return h("div", { className: "game-body" },
+    h("div", { className: "game-stats" },
+      h("span", null, h("small", null, "Level"), h("strong", null, level)),
+      h("span", null, h("small", null, "Found"), h("strong", null, `${score}/${cfg.goal}`)),
+      h("span", null, h("small", null, "Time"), h("strong", { className: timeLeft <= 5 ? "is-low" : "" }, `${timeLeft}s`))
+    ),
+    !running && !won && !finished ? h("div", { className: "game-intro" },
+      h("p", null, `Find ${cfg.goal} odd emojis out in ${cfg.time} seconds. A wrong tap costs 3 seconds.`),
+      h("button", { className: "game-primary", type: "button", onClick: start }, "Start")
+    ) : null,
+    won ? h("div", { className: "game-win" }, h(Icon, { name: "crown" }), h("strong", null, `Level ${level} cleared!`), h("span", null, `${cfg.goal} found with ${timeLeft}s to spare`), h("button", { className: "game-primary", type: "button", onClick: start }, "Play again")) : null,
+    finished ? h("div", { className: "game-lose" }, h("strong", null, "Time's up"), h("span", null, `You found ${score} of ${cfg.goal}. Try again!`), h("button", { className: "game-primary", type: "button", onClick: start }, "Retry")) : null,
+    running && grid ? h("div", { className: "find-grid", style: { gridTemplateColumns: `repeat(${grid.size}, 1fr)` } },
+      Array.from({ length: grid.count }).map((_, i) => h("button", {
+        key: i, className: "find-cell", type: "button", onClick: () => pick(i)
+      }, i === grid.oddIndex ? grid.odd : grid.base))
+    ) : null
+  );
+}
+
+function WordScrambleGame({ level, onClear }) {
+  const cfg = gameLevelConfigs.words[level - 1];
+  const pool = () => {
+    const filtered = scrambleWords.filter((w) => w.length >= cfg.minLen && w.length <= cfg.maxLen);
+    const source = filtered.length > 0 ? filtered : scrambleWords;
+    return source[Math.floor(Math.random() * source.length)];
+  };
+  const scramble = (word) => {
+    let letters = word.split("");
+    do { letters = shuffleArray(letters); } while (letters.join("") === word && word.length > 1);
+    return letters;
+  };
+  const [target, setTarget] = useState(pool);
+  const [poolLetters, setPoolLetters] = useState(() => scramble(target).map((ch, i) => ({ id: i, ch, used: false })));
+  const [answer, setAnswer] = useState([]);
+  const [solved, setSolved] = useState(0);
+  const [status, setStatus] = useState("");
+  const [won, setWon] = useState(false);
+
+  const reset = (word) => {
+    const w = word || pool();
+    setTarget(w);
+    setPoolLetters(scramble(w).map((ch, i) => ({ id: i, ch, used: false })));
+    setAnswer([]);
+    setStatus("");
+  };
+
+  const addLetter = (item) => {
+    if (item.used || status === "win" || won) return;
+    setPoolLetters((cur) => cur.map((p) => p.id === item.id ? { ...p, used: true } : p));
+    const nextAnswer = answer.concat({ poolId: item.id, ch: item.ch });
+    setAnswer(nextAnswer);
+    if (nextAnswer.length === target.length) {
+      if (nextAnswer.map((a) => a.ch).join("") === target) {
+        const nextSolved = solved + 1;
+        setSolved(nextSolved);
+        if (nextSolved >= cfg.goal) {
+          setWon(true);
+          setStatus("");
+          onClear(level);
+        } else {
+          setStatus("win");
+        }
+      } else {
+        setStatus("wrong");
+      }
+    }
+  };
+
+  const removeLetter = (idx) => {
+    if (status === "win") return;
+    const removed = answer[idx];
+    if (!removed) return;
+    setAnswer((cur) => cur.filter((_, i) => i !== idx));
+    setPoolLetters((cur) => cur.map((p) => p.id === removed.poolId ? { ...p, used: false } : p));
+    setStatus("");
+  };
+
+  const clearAnswer = () => {
+    setAnswer([]);
+    setPoolLetters((cur) => cur.map((p) => ({ ...p, used: false })));
+    setStatus("");
+  };
+
+  const restart = () => { setSolved(0); setWon(false); reset(); };
+
+  return h("div", { className: "game-body" },
+    h("div", { className: "game-stats" },
+      h("span", null, h("small", null, "Level"), h("strong", null, level)),
+      h("span", null, h("small", null, "Solved"), h("strong", null, `${solved}/${cfg.goal}`)),
+      h("span", null, h("small", null, "Length"), h("strong", null, target.length))
+    ),
+    won ? h("div", { className: "game-win" }, h(Icon, { name: "crown" }), h("strong", null, `Level ${level} cleared!`), h("span", null, `${cfg.goal} recovery words rebuilt`), h("button", { className: "game-primary", type: "button", onClick: restart }, "Play again")) : null,
+    !won ? h("div", { className: `scramble-answer${status === "wrong" ? " is-wrong" : ""}${status === "win" ? " is-win" : ""}` },
+      Array.from({ length: target.length }).map((_, i) => {
+        const filled = answer[i];
+        return h("button", { key: i, className: `scramble-slot${filled ? " is-filled" : ""}`, type: "button", onClick: () => filled ? removeLetter(i) : null }, filled ? filled.ch : "");
+      })
+    ) : null,
+    status === "win" && !won ? h("div", { className: "game-win" }, h(Icon, { name: "check-circle" }), h("strong", null, "Correct!"), h("button", { className: "game-primary", type: "button", onClick: () => reset() }, "Next word")) : null,
+    status !== "win" && !won ? h("div", { className: "scramble-pool" },
+      poolLetters.map((p) => h("button", { key: p.id, className: `scramble-tile${p.used ? " is-used" : ""}`, type: "button", disabled: p.used, onClick: () => addLetter(p) }, p.ch))
+    ) : null,
+    status !== "win" && !won ? h("div", { className: "scramble-actions" },
+      h("button", { className: "game-restart", type: "button", onClick: clearAnswer }, h(Icon, { name: "undo" }), "Clear"),
+      h("button", { className: "game-restart", type: "button", onClick: () => reset() }, "Skip")
+    ) : null
+  );
+}
+
+function StroopTestGame({ level, onClear }) {
+  const cfg = gameLevelConfigs.stroop[level - 1];
+  const [trial, setTrial] = useState(null);
+  const [round, setRound] = useState(0);
+  const [misses, setMisses] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(cfg.perRound);
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState("");
+  const trialIdRef = useRef(0);
+
+  const nextTrial = () => {
+    const wordIdx = Math.floor(Math.random() * stroopColors.length);
+    let inkIdx = Math.floor(Math.random() * stroopColors.length);
+    if (Math.random() < 0.7 && inkIdx === wordIdx) inkIdx = (inkIdx + 1 + Math.floor(Math.random() * (stroopColors.length - 1))) % stroopColors.length;
+    trialIdRef.current += 1;
+    setTrial({ wordIdx, inkIdx, id: trialIdRef.current });
+    setTimeLeft(cfg.perRound);
+  };
+
+  const start = () => {
+    setRound(0);
+    setMisses(0);
+    setResult("");
+    setRunning(true);
+    nextTrial();
+  };
+
+  const answer = (choiceIdx, timedOut) => {
+    if (!running || !trial) return;
+    const correct = !timedOut && choiceIdx === trial.inkIdx;
+    const nextMisses = correct ? misses : misses + 1;
+    const nextRound = round + 1;
+    setMisses(nextMisses);
+    setRound(nextRound);
+    if (nextRound >= cfg.rounds) {
+      setRunning(false);
+      setTrial(null);
+      const cleared = nextMisses <= cfg.allowedMiss;
+      setResult(cleared ? "win" : "lose");
+      if (cleared) onClear(level);
+    } else {
+      nextTrial();
+    }
+  };
+
+  useEffect(() => {
+    if (!running || !trial) return;
+    const id = setInterval(() => {
+      setTimeLeft((t) => {
+        const next = Math.round((t - 0.1) * 10) / 10;
+        if (next <= 0) {
+          clearInterval(id);
+          answer(-1, true);
+          return 0;
+        }
+        return next;
+      });
+    }, 100);
+    return () => clearInterval(id);
+  }, [running, trial?.id]);
+
+  return h("div", { className: "game-body" },
+    h("div", { className: "game-stats" },
+      h("span", null, h("small", null, "Level"), h("strong", null, level)),
+      h("span", null, h("small", null, "Round"), h("strong", null, `${Math.min(round + (running ? 1 : 0), cfg.rounds)}/${cfg.rounds}`)),
+      h("span", null, h("small", null, "Misses"), h("strong", { className: misses > cfg.allowedMiss ? "is-low" : "" }, `${misses}/${cfg.allowedMiss}`))
+    ),
+    !running && result === "" ? h("div", { className: "game-intro" },
+      h("p", null, "A color word flashes in a mismatched ink. Tap the color of the ink, not the word. You have ", h("strong", null, `${cfg.perRound}s`), " per round and can miss up to ", h("strong", null, cfg.allowedMiss), "."),
+      h("button", { className: "game-primary", type: "button", onClick: start }, "Start")
+    ) : null,
+    result === "win" ? h("div", { className: "game-win" }, h(Icon, { name: "crown" }), h("strong", null, `Level ${level} cleared!`), h("span", null, `Only ${misses} miss${misses === 1 ? "" : "es"} over ${cfg.rounds} rounds`), h("button", { className: "game-primary", type: "button", onClick: start }, "Play again")) : null,
+    result === "lose" ? h("div", { className: "game-lose" }, h("strong", null, "So close"), h("span", null, `${misses} misses allowed ${cfg.allowedMiss}. Slow down and trust the ink.`), h("button", { className: "game-primary", type: "button", onClick: start }, "Retry")) : null,
+    running && trial ? h("div", { className: "stroop-stage" },
+      h("div", { className: "stroop-timer" }, h("span", { style: { width: `${(timeLeft / cfg.perRound) * 100}%` } })),
+      h("div", { className: "stroop-word", style: { color: stroopColors[trial.inkIdx].css } }, stroopColors[trial.wordIdx].name)
+    ) : null,
+    running ? h("div", { className: "stroop-options" },
+      stroopColors.map((c, i) => h("button", { key: c.name, className: "stroop-chip", type: "button", style: { background: c.css }, onClick: () => answer(i, false), "aria-label": c.name }))
+    ) : null
+  );
+}
+
+function MathBlitzGame({ level, onClear }) {
+  const cfg = gameLevelConfigs.math[level - 1];
+  const rand = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
+
+  const makeQuestion = () => {
+    const op = cfg.ops[Math.floor(Math.random() * cfg.ops.length)];
+    let a, b, answer;
+    if (op === "+") { a = rand(2, cfg.max); b = rand(2, cfg.max); answer = a + b; }
+    else if (op === "-") { a = rand(5, cfg.max); b = rand(1, a); answer = a - b; }
+    else if (op === "×") { a = rand(2, Math.min(cfg.max, 12)); b = rand(2, 9); answer = a * b; }
+    else { b = rand(2, 9); answer = rand(2, 9); a = b * answer; }
+    const options = new Set([answer]);
+    while (options.size < 4) {
+      const delta = rand(1, Math.max(3, Math.round(answer * 0.3))) * (Math.random() < 0.5 ? -1 : 1);
+      const fake = answer + delta;
+      if (fake >= 0 && fake !== answer) options.add(fake);
+    }
+    return { text: `${a} ${op} ${b}`, answer, options: shuffleArray(Array.from(options)) };
+  };
+
+  const [question, setQuestion] = useState(makeQuestion);
+  const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(cfg.time);
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState("");
+  const [flash, setFlash] = useState("");
+
+  const start = () => {
+    setScore(0);
+    setTimeLeft(cfg.time);
+    setResult("");
+    setQuestion(makeQuestion());
+    setRunning(true);
+  };
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) { clearInterval(id); setRunning(false); setResult((cur) => cur || "lose"); return 0; }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [running]);
+
+  const pick = (value) => {
+    if (!running) return;
+    if (value === question.answer) {
+      const next = score + 1;
+      setScore(next);
+      setFlash("ok");
+      if (next >= cfg.goal) {
+        setRunning(false);
+        setResult("win");
+        onClear(level);
+      } else {
+        setTimeout(() => { setFlash(""); setQuestion(makeQuestion()); }, 250);
+      }
+    } else {
+      setFlash("bad");
+      setTimeLeft((t) => Math.max(1, t - 2));
+      setTimeout(() => setFlash(""), 250);
+    }
+  };
+
+  return h("div", { className: "game-body" },
+    h("div", { className: "game-stats" },
+      h("span", null, h("small", null, "Level"), h("strong", null, level)),
+      h("span", null, h("small", null, "Score"), h("strong", null, `${score}/${cfg.goal}`)),
+      h("span", null, h("small", null, "Time"), h("strong", { className: timeLeft <= 5 ? "is-low" : "" }, `${timeLeft}s`))
+    ),
+    !running && result === "" ? h("div", { className: "game-intro" },
+      h("p", null, `Solve ${cfg.goal} problems in ${cfg.time} seconds. A wrong answer costs 2 seconds. Ops: ${cfg.ops.join(" ")}`),
+      h("button", { className: "game-primary", type: "button", onClick: start }, "Start")
+    ) : null,
+    result === "win" ? h("div", { className: "game-win" }, h(Icon, { name: "crown" }), h("strong", null, `Level ${level} cleared!`), h("span", null, `${cfg.goal} solved with ${timeLeft}s left`), h("button", { className: "game-primary", type: "button", onClick: start }, "Play again")) : null,
+    result === "lose" ? h("div", { className: "game-lose" }, h("strong", null, "Time's up"), h("span", null, `You solved ${score} of ${cfg.goal}.`), h("button", { className: "game-primary", type: "button", onClick: start }, "Retry")) : null,
+    running ? h("div", { className: `math-question${flash === "ok" ? " is-ok" : ""}${flash === "bad" ? " is-bad" : ""}` }, question.text, " = ?") : null,
+    running ? h("div", { className: "math-options" },
+      question.options.map((opt) => h("button", { key: opt, className: "math-chip", type: "button", onClick: () => pick(opt) }, opt))
+    ) : null
+  );
+}
+
+function BreathHoldGame({ level, onClear }) {
+  const cfg = gameLevelConfigs.breath[level - 1];
+  const phases = [
+    { key: "inhale", label: "Breathe in through your nose", secs: 4 },
+    { key: "hold", label: "Hold gently", secs: 7 },
+    { key: "exhale", label: "Exhale slowly through your mouth", secs: 8 }
+  ];
+  const [running, setRunning] = useState(false);
+  const [phaseIdx, setPhaseIdx] = useState(0);
+  const [left, setLeft] = useState(phases[0].secs);
+  const [cyclesDone, setCyclesDone] = useState(0);
+  const [won, setWon] = useState(false);
+
+  const start = () => {
+    setPhaseIdx(0);
+    setLeft(phases[0].secs);
+    setCyclesDone(0);
+    setWon(false);
+    setRunning(true);
+  };
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => {
+      setLeft((t) => {
+        if (t > 1) return t - 1;
+        const nextIdx = (phaseIdx + 1) % phases.length;
+        if (nextIdx === 0) {
+          const done = cyclesDone + 1;
+          setCyclesDone(done);
+          if (done >= cfg.cycles) {
+            clearInterval(id);
+            setRunning(false);
+            setWon(true);
+            onClear(level);
+            return 0;
+          }
+        }
+        setPhaseIdx(nextIdx);
+        return phases[nextIdx].secs;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [running, phaseIdx, cyclesDone]);
+
+  const phase = phases[phaseIdx];
+
+  return h("div", { className: "game-body" },
+    h("div", { className: "game-stats" },
+      h("span", null, h("small", null, "Level"), h("strong", null, level)),
+      h("span", null, h("small", null, "Cycles"), h("strong", null, `${won ? cfg.cycles : cyclesDone}/${cfg.cycles}`)),
+      h("span", null, h("small", null, "Pattern"), h("strong", null, "4-7-8"))
+    ),
+    !running && !won ? h("div", { className: "game-intro" },
+      h("p", null, `Inhale 4 seconds, hold 7, exhale 8. Complete ${cfg.cycles} full cycles (about ${Math.round((cfg.cycles * 19) / 60)} min) to let the urge pass like a wave.`),
+      h("button", { className: "game-primary", type: "button", onClick: start }, "Begin")
+    ) : null,
+    won ? h("div", { className: "game-win" }, h(Icon, { name: "check-circle" }), h("strong", null, `Level ${level} cleared!`), h("span", null, `${cfg.cycles} calming cycles complete. The urge has passed.`), h("button", { className: "game-primary", type: "button", onClick: start }, "Again")) : null,
+    running ? h("div", { className: "breath-stage" },
+      h("div", { className: `breath-orb is-${phase.key}`, style: { "--breath-secs": `${phase.secs}s` } }),
+      h("strong", { className: "breath-count" }, left),
+      h("p", { className: "breath-label" }, phase.label)
+    ) : null
+  );
 }
 
 function ProfilePage({ onAction }) {
@@ -1716,42 +2505,6 @@ function AchievementBadge({ item, onAction }) {
   );
 }
 
-function MeliusChatPage({ onBack }) {
-  const [draft, setDraft] = useState("");
-  const [messages, setMessages] = useState([]);
-  const [isSending, setIsSending] = useState(false);
-
-  async function sendMessage(event) {
-    event.preventDefault();
-    const text = draft.trim();
-    if (!text || isSending) return;
-    const nextMessages = [...messages, { role: "user", text }];
-    setMessages(nextMessages);
-    setDraft("");
-    setIsSending(true);
-    try {
-      const reply = await sendMeliusMessage(nextMessages);
-      setMessages([...nextMessages, { role: "assistant", text: reply }]);
-    } catch (error) {
-      setMessages([...nextMessages, { role: "assistant", text: getClientErrorMessage(error) }]);
-    } finally {
-      setIsSending(false);
-    }
-  }
-
-  return h(
-    "section",
-    { className: "chat-page" },
-    h("header", { className: "chat-header" }, h("button", { type: "button", onClick: onBack, "aria-label": "Back to analytics" }, h(Icon, { name: "chevron-left" })), h("span", null, h("strong", null, "Melius"), h("small", null, "qwen3.7-plus recovery assistant"))),
-    h("div", { className: "chat-thread" },
-      messages.length === 0 ? h("div", { className: "empty-chat" }, h("strong", null, "What feels hardest right now?"), h("p", null, "Tell Melius about the urge, trigger, or relapse risk. It will help you get through the next few minutes.")) : null,
-      messages.map((message, index) => h("p", { key: index, className: `chat-bubble ${message.role}` }, message.text)),
-      isSending ? h("p", { className: "chat-bubble assistant is-thinking" }, "Melius is thinking...") : null
-    ),
-    h("form", { className: "chat-composer", onSubmit: sendMessage }, h("input", { value: draft, onChange: (event) => setDraft(event.target.value), placeholder: "Message Melius..." }), h("button", { type: "submit", disabled: isSending || !draft.trim(), "aria-label": "Send" }, h(Icon, { name: "send" })))
-  );
-}
-
 function BottomNav({ page, onNavigate }) {
   const navItems = [
     { label: "Home", icon: "home", page: "home" },
@@ -1778,8 +2531,8 @@ function Milestone({ item, onAction }) {
       onClick: () => onAction(`day ${item.day}`),
       "aria-label": `${item.name}, day ${item.day}${item.current ? ", current" : item.complete ? ", complete" : ", locked"}`
     },
-    h("span", { className: "planet", style: item.style },
-      h("span", { className: "milestone-day" }, item.day)
+    h("span", { className: "planet", style: item.style, "aria-hidden": "true" },
+      h("span", { className: "planet-fx" })
     ),
     h("strong", null, item.name),
     h("small", null, item.days)
@@ -2212,17 +2965,19 @@ function getResetSelectionCount(review) {
   }, 0);
 }
 
-async function sendMeliusMessage(messages) {
+async function sendMeliusMessage(messages, requestId, signal) {
   const response = await fetch(MELIUS_CHAT_ENDPOINT, {
-    method: "POST",
+    method: "POST", signal,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages })
+    body: JSON.stringify({ messages, requestId })
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.error || "Melius is unavailable.");
+    const error = new Error(data.error || "暂时没有收到回复，请重新发送。");
+    error.actions = data.actions || [];
+    throw error;
   }
-  return data.reply || "";
+  return data;
 }
 
 function getClientErrorMessage(error) {
@@ -2440,6 +3195,8 @@ function createFallbackAnalytics() {
 
 function Icon({ name }) {
   const icons = {
+    microphone: h("svg", { viewBox: "0 0 24 24" }, h("path", { d: "M12 15a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v7a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.93V22h2v-3.07A7 7 0 0 0 19 12h-2Z" })),
+    stop: h("svg", { viewBox: "0 0 24 24" }, h("path", { d: "M6 6h12v12H6z" })),
     bars: h("svg", { viewBox: "0 0 24 24" }, h("path", { d: "M5 18h14v2H5v-2Zm1-7h4v5H6v-5Zm6-5h4v10h-4V6Zm6 8h4v2h-4v-2Z" })),
     people: h("svg", { viewBox: "0 0 24 24" }, h("path", { d: "M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3Zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3Zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5Zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5Z" })),
     breathe: h("svg", { viewBox: "0 0 24 24" }, h("path", { d: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8Zm-5-6c0-2.76 2.24-5 5-5s5 2.24 5 5h2c0-3.86-3.14-7-7-7s-7 3.14-7 7h2Zm5-3c-1.66 0-3 1.34-3 3h2c0-.55.45-1 1-1s1 .45 1 1h2c0-1.66-1.34-3-3-3Z" })),
@@ -3172,7 +3929,7 @@ function BlockerTier3View({ blockerState, setBlockerState, onAction, showToast }
 
 function CommunityPage({ posts, filter, onAction }) {
   const [filterOpen, setFilterOpen] = useState(false);
-  return h("div", { className: "community-page" },
+  return h("div", { className: "community-page community-feed-page" },
     h("header", { className: "community-header" },
       h("div", { className: "community-header-left" },
         h("button", { className: "community-filter-btn", type: "button", onClick: () => setFilterOpen(!filterOpen) },

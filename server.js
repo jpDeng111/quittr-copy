@@ -2,19 +2,21 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { createMeliusService } = require("./melius");
 
 const ROOT_DIR = __dirname;
+loadEnvFile(path.join(ROOT_DIR, ".env"));
 const STATIC_DIR = path.join(ROOT_DIR, "public");
-const DATA_DIR = path.join(ROOT_DIR, "data");
+const DATA_DIR = process.env.QUITTR_DATA_DIR || path.join(ROOT_DIR, "data");
 const QUITTR_STATE_PATH = path.join(DATA_DIR, "quittr-state.json");
 const MELIUS_MODEL_NAME = process.env.MELIUS_MODEL || "qwen3.7-plus";
 const API_BASE_URL = String(
   process.env.DASHSCOPE_BASE_URL || "https://coding.dashscope.aliyuncs.com/v1"
 ).replace(/\/+$/, "");
 
-loadEnvFile(path.join(ROOT_DIR, ".env"));
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const PORT = Number(process.env.PORT || 3000);
+const melius = createMeliusService({ readState: readQuittrState, writeState: writeQuittrState, complete: requestMeliusCompletion });
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -35,8 +37,20 @@ const server = http.createServer(async (req, res) => {
       return serveFile(res, path.join(STATIC_DIR, "app.js"), "application/javascript; charset=utf-8");
     }
 
+    if (req.method === "GET" && url.pathname === "/melius-chat.js") {
+      return serveFile(res, path.join(STATIC_DIR, "melius-chat.js"), "application/javascript; charset=utf-8");
+    }
+
     if (req.method === "GET" && url.pathname === "/styles.css") {
       return serveFile(res, path.join(STATIC_DIR, "styles.css"), "text/css; charset=utf-8");
+    }
+
+    if (req.method === "GET" && url.pathname === "/vendor/react.js") {
+      return serveFile(res, path.join(STATIC_DIR, "vendor", "react.js"), "application/javascript; charset=utf-8");
+    }
+
+    if (req.method === "GET" && url.pathname === "/vendor/react-dom.js") {
+      return serveFile(res, path.join(STATIC_DIR, "vendor", "react-dom.js"), "application/javascript; charset=utf-8");
     }
 
     if (req.method === "POST" && url.pathname === "/api/melius/chat") {
@@ -153,65 +167,40 @@ server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
 
-async function handleMeliusChat(req, res) {
-  const body = await readJson(req);
+async function requestMeliusCompletion(payload) {
   const apiKey = String(process.env.DASHSCOPE_API_KEY || "").trim();
-  const messages = Array.isArray(body.messages) ? body.messages : [];
-  const safeMessages = messages
-    .filter((message) => message && (message.role === "user" || message.role === "assistant"))
-    .map((message) => ({
-      role: message.role,
-      content: String(message.text || message.content || "").slice(0, 3000)
-    }))
-    .filter((message) => message.content.trim())
-    .slice(-12);
-
-  if (!apiKey) {
-    return sendJson(res, 500, { error: "Missing DASHSCOPE_API_KEY in .env." });
-  }
-
-  if (safeMessages.length === 0) {
-    return sendJson(res, 400, { error: "Message is empty." });
-  }
-
+  if (!apiKey) throw new Error("Missing DASHSCOPE_API_KEY in .env.");
   const response = await fetch(`${API_BASE_URL}/chat/completions`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: MELIUS_MODEL_NAME,
-      messages: [
-        {
-          role: "system",
-          content: [
-            "You are Melius, a calm and practical nofap/reboot recovery assistant.",
-            "Help users reduce sexual urges, prevent relapse, process shame without judgment, and build healthier routines.",
-            "Use short, warm, direct responses. Ask one useful question when needed.",
-            "When the user is having an urge, prioritize grounding, delay tactics, environment change, and a concrete next 10-minute action.",
-            "Do not provide erotic content, pornographic details, or anything that intensifies arousal.",
-            "If the user mentions self-harm, coercion, abuse, or immediate danger, encourage contacting local emergency help or a trusted person right away.",
-            "Match the user's language."
-          ].join(" ")
-        },
-        ...safeMessages
-      ],
-      temperature: 0.7
-    })
+    signal: AbortSignal.timeout(25000),
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: MELIUS_MODEL_NAME, enable_thinking: false, ...payload })
   });
-
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const detail = data.message || data.code || response.statusText;
-    return sendJson(res, response.status, { error: `Melius request failed: ${detail}` });
+    const detail = data.error?.message || data.message || data.code || response.statusText;
+    throw new Error(`Melius request failed: ${String(detail).replaceAll(apiKey, "[redacted]")}`);
   }
+  return data;
+}
 
-  const reply = extractTextFromDashScope(data);
-  sendJson(res, 200, {
-    model: MELIUS_MODEL_NAME,
-    reply: reply || "I am here with you. Tell me what feels strongest right now."
-  });
+async function handleMeliusChat(req, res) {
+  const body = await readJson(req);
+  const messages = (Array.isArray(body.messages) ? body.messages : [])
+    .filter((message) => message && ["user", "assistant"].includes(message.role))
+    .map((message) => ({ role: message.role, content: String(message.text || message.content || "").slice(0, 3000) }))
+    .filter((message) => message.content.trim()).slice(-12);
+  const requestId = typeof body.requestId === "string" ? body.requestId : crypto.randomUUID();
+  try {
+    const result = await melius.send({ requestId, messages });
+    sendJson(res, 200, { ...result, model: MELIUS_MODEL_NAME });
+  } catch (error) {
+    const timedOut = error.name === "TimeoutError" || error.name === "AbortError";
+    sendJson(res, error.status || (timedOut ? 504 : 502), {
+      error: timedOut ? "回复等待超时，请重新发送。已完成的记录不会重复保存。" : error.message,
+      requestId, actions: melius.savedActions(requestId)
+    });
+  }
 }
 
 async function handleQuittrRelapse(req, res) {

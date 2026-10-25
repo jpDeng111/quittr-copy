@@ -15,9 +15,13 @@
     "2026-06-23T23:29:11.260Z",
     "2026-06-23T23:29:11.404Z",
     "2026-06-23T23:34:19.235Z",
-    "2026-06-24T07:16:27.518Z"
+    "2026-06-24T07:16:27.518Z",
+    "2026-06-28T19:35:59.958Z",
+    "2026-06-28T19:57:37.976Z",
+    "2026-07-07T20:46:58.332Z",
+    "2026-10-18T09:46:17.517Z"
   ],
-  "updatedAt": "2026-06-24T07:16:27.518Z",
+  "updatedAt": "2026-10-25T09:20:15.631Z",
   "urges": [
     {
       "id": "1f71a489-4efc-460c-8524-2fbb42450385",
@@ -76,6 +80,23 @@
   ],
   "journalEntries": [
     {
+      "id": "c9366a66-39c8-499f-b3c5-413b80af4f06",
+      "createdAt": "2026-10-25T09:19:50.218Z",
+      "source": "melius",
+      "sourceMessageId": "4dcc82ba-44f4-4eda-8bea-4c246e6b5a40",
+      "sourceQuote": "我觉得深呼吸有帮助，帮我把杂念排除了。我想和之前的女嘉宾再联系，这让我非常想破戒",
+      "title": "深呼吸后的反思与冲动",
+      "body": "用户反馈深呼吸练习帮助排除了杂念。但提到想与之前的女嘉宾（前女友）再联系，这个念头引发了非常强烈的破戒冲动。",
+      "category": "reflection",
+      "mood": ""
+    },
+    {
+      "id": "29e824ab-5e43-4f88-af95-61047d32a64a",
+      "title": "0707",
+      "body": "今天工作很累，不过烧 token 很快乐。希望每天烧的 token 能早日抵过我的工资",
+      "createdAt": "2026-07-06T17:04:55.346Z"
+    },
+    {
       "id": "e121e790-401f-4548-bff1-66221166f372",
       "title": "鼻子有鼻涕",
       "body": "睡觉没盖被子，着凉了",
@@ -89,6 +110,480 @@
     }
   ],
   "reasons": [
-    "保持清醒和专注"
-  ]
+    "保持清醒和专注",
+    "孤独",
+    "我想实现理想",
+    "专注于事项"
+  ],
+  "blocker": {
+    "protectionEnabled": true,
+    "tier1": {
+      "enabled": true,
+      "presetDomains": [
+        "pornhub.com",
+        "xvideos.com",
+        "xnxx.com",
+        "xhamster.com",
+        "redtube.com",
+        "youporn.com",
+        "tube8.com",
+        "spankbang.com",
+        "brazzers.com",
+        "onlyfans.com",
+        "chaturbate.com",
+        "stripchat.com",
+        "cam4.com",
+        "livejasmin.com",
+        "bongacams.com",
+        "eporner.com",
+        "tnaflix.com",
+        "beeg.com",
+        "daftsex.com",
+        "xmoviesforyou.com"
+      ],
+      "customWebsites": []
+    },
+    "tier2": {
+      "enabled": false,
+      "screenTimeIntegration": true,
+      "apps": [
+        {
+          "id": "facebook",
+          "name": "Facebook",
+          "category": "Social",
+          "blockedAt": "2026-07-07T21:36:02.630Z"
+        }
+      ]
+    },
+    "tier3": {
+      "enabled": false,
+      "lockedAt": null,
+      "passcodeHash": null
+    },
+    "screenTime": {
+      "todayMinutes": 0,
+      "pickups": 0,
+      "updatedAt": "2026-07-06T17:07:05.125Z"
+    },
+    "updatedAt": "2026-07-07T21:37:54.999Z"
+  },
+  "community": {
+    "posts": [
+      {
+        "id": "0d93b392-9070-4ca4-b8c4-21592e29e760",
+        "author": "You",
+        "authorAvatar": "🦁",
+        "streak": 0,
+        "title": "好困",
+        "body": "艰难困苦，玉汝于成",
+        "createdAt": "2026-10-18T08:54:27.738Z",
+        "comments": [],
+        "likes": 0,
+        "likedByMe": false,
+        "views": 1
+      },
+      {
+        "id": "8ef3dc3a-946a-4973-83ca-9a735202c07c",
+        "author": "Constant Lie",
+        "authorAvatar": "🦊",
+        "streak": 0,
+        "title": "Constant Lie",
+        "body": "I do good for a week or so and then lie to myself that one time won't hurt. But it always does. How do you stop the self-deception?",
+        "createdAt": "2026-06-09T21:46:39.100Z",
+        "comments": [],
+        "likes": 2,
+        "likedByMe": false,
+        "views": 43
+      },
+      {
+        "id": "a1944fec-b2ae-469c-aa13-0ebb9f0ee4b7",
+        "author": "Nathan",
+        "authorAvatar": "🐶",
+        "streak": 14,
+        "title": "Peace",
+        "body": "Guys... I am so stoked right now. Two weeks clean and I finally feel like myself again. The fog is lifting. If you're struggling right now, keep going. It gets better.",
+        "createdAt": "2026-06-16T21:46:39.100Z",
+        "comments": [
+          {
+            "id": "4860d925-6dc1-4541-8784-6fa129f0c050",
+            "author": "Ian Rent",
+            "authorAvatar": "🐻",
+            "text": "This is inspiring man, keep it up!",
+            "createdAt": "2026-06-17T21:46:39.100Z"
+          }
+        ],
+        "likes": 9,
+        "likedByMe": false,
+        "views": 50
+      },
+      {
+        "id": "2f666ec5-fd47-4f46-8de6-9c1dd9591c75",
+        "author": "Ian Rent",
+        "authorAvatar": "🐻",
+        "streak": 0,
+        "title": "I keep doing it",
+        "body": "I've been doing it at least once a day and it's pissing me off but it's a habit now. How do I stop?",
+        "createdAt": "2026-06-23T21:46:39.100Z",
+        "comments": [],
+        "likes": 0,
+        "likedByMe": false,
+        "views": 54
+      },
+      {
+        "id": "fb8a7f4b-df0b-423d-8e67-914626def66a",
+        "author": "Rigoberto Reyes",
+        "authorAvatar": "🦁",
+        "streak": 3,
+        "title": "I'm struggling",
+        "body": "I'm having a very hard time with this. Every night it's the same battle. Any tips for getting through the late night urges?",
+        "createdAt": "2026-06-27T21:46:39.100Z",
+        "comments": [
+          {
+            "id": "bae35766-b128-4690-8870-0f71f07a1322",
+            "author": "Kempa",
+            "authorAvatar": "🐼",
+            "text": "Cold showers at night helped me a lot. Stay strong brother.",
+            "createdAt": "2026-06-28T21:46:39.100Z"
+          }
+        ],
+        "likes": 1,
+        "likedByMe": false,
+        "views": 59
+      },
+      {
+        "id": "5960aff9-c933-4cff-8b54-f35a842d8d5f",
+        "author": "Kempa",
+        "authorAvatar": "🐼",
+        "streak": 0,
+        "title": "Need a sex therapist hotline",
+        "body": "I can't stop guys I need help. Does anyone know a hotline or resource I can call? I feel like I can't do this alone anymore.",
+        "createdAt": "2026-06-30T21:46:39.100Z",
+        "comments": [],
+        "likes": 0,
+        "likedByMe": false,
+        "views": 54
+      },
+      {
+        "id": "5150a87c-5db5-4e29-9a93-9a9b34df2eb2",
+        "author": "Zeke",
+        "authorAvatar": "🐯",
+        "streak": 15,
+        "title": "Day 15",
+        "body": "No porn, but I can't stop jerking off. How do I stop? The porn is gone but the habit is still there. Any advice?",
+        "createdAt": "2026-07-04T21:46:39.100Z",
+        "comments": [],
+        "likes": 0,
+        "likedByMe": false,
+        "views": 86
+      },
+      {
+        "id": "9925b46e-72dd-46cb-9cba-1d60c715ebb5",
+        "author": "Anonymous",
+        "authorAvatar": "🦉",
+        "streak": 7,
+        "title": "Don't go on Reddit or X",
+        "body": "Seriously, those platforms are full of triggers. Deleted both apps and my urges dropped significantly. Highly recommend.",
+        "createdAt": "2026-07-06T21:46:39.100Z",
+        "comments": [
+          {
+            "id": "43c3adb3-33d7-4854-8119-ada639ec587a",
+            "author": "You",
+            "authorAvatar": "🦉",
+            "text": "yes",
+            "createdAt": "2026-10-11T15:28:10.921Z"
+          },
+          {
+            "id": "e09bc3e7-1067-490c-9824-9c0e2d916cdc",
+            "author": "You",
+            "authorAvatar": "🐻",
+            "text": "ye's'ye's",
+            "createdAt": "2026-10-11T15:28:09.304Z"
+          }
+        ],
+        "likes": 5,
+        "likedByMe": false,
+        "views": 32
+      }
+    ],
+    "updatedAt": "2026-10-18T08:54:30.362Z"
+  },
+  "meliusTurns": {
+    "6c08e90d-f17a-4903-94fe-55868effba06": {
+      "hash": "78799e8fd38750cfed681d66ccf55c509a5a5fa9d982e6d5a6a70ef91f61b2df",
+      "operations": {
+        "open_game": {
+          "id": "6c08e90d-f17a-4903-94fe-55868effba06:open_game",
+          "status": "ready",
+          "type": "game",
+          "title": "Memory Recall",
+          "detail": "随时返回这里继续对话",
+          "gameId": "memory",
+          "autoOpen": true
+        }
+      },
+      "createdAt": "2026-10-24T16:15:11.657Z",
+      "updatedAt": "2026-10-24T16:15:13.004Z",
+      "response": {
+        "requestId": "6c08e90d-f17a-4903-94fe-55868effba06",
+        "reply": "记忆小游戏已打开。祝你玩得开心！如果需要聊天或支持，随时回来。",
+        "actions": [
+          {
+            "id": "6c08e90d-f17a-4903-94fe-55868effba06:open_game",
+            "status": "ready",
+            "type": "game",
+            "title": "Memory Recall",
+            "detail": "随时返回这里继续对话",
+            "gameId": "memory",
+            "autoOpen": true
+          }
+        ]
+      }
+    },
+    "339ca4bb-9000-458a-bb2c-e6c6e8a86b09": {
+      "hash": "9ecd66c1413f1fea691de76277ee0567498b052cb88d986bf691db18b7a5556a",
+      "operations": {},
+      "createdAt": "2026-10-25T07:24:41.576Z",
+      "response": {
+        "requestId": "339ca4bb-9000-458a-bb2c-e6c6e8a86b09",
+        "reply": "你好！很高兴见到你。今天感觉怎么样？有什么我可以帮你的吗？",
+        "actions": []
+      }
+    },
+    "38a89a8f-2687-4b71-a640-8505635fea81": {
+      "hash": "76f3d865232e3c526998e7cf2d5b471fe354949cb6a28b80c5241493270ec391",
+      "operations": {
+        "open_game": {
+          "id": "38a89a8f-2687-4b71-a640-8505635fea81:open_game",
+          "status": "ready",
+          "type": "game",
+          "title": "Memory Recall",
+          "detail": "随时返回这里继续对话",
+          "gameId": "memory",
+          "autoOpen": true
+        }
+      },
+      "createdAt": "2026-10-25T07:24:49.271Z",
+      "updatedAt": "2026-10-25T07:24:50.878Z",
+      "response": {
+        "requestId": "38a89a8f-2687-4b71-a640-8505635fea81",
+        "reply": "记忆游戏已经为你打开了！祝你玩得开心。如果之后想聊聊或者需要支持，随时回来找我。",
+        "actions": [
+          {
+            "id": "38a89a8f-2687-4b71-a640-8505635fea81:open_game",
+            "status": "ready",
+            "type": "game",
+            "title": "Memory Recall",
+            "detail": "随时返回这里继续对话",
+            "gameId": "memory",
+            "autoOpen": true
+          }
+        ]
+      }
+    },
+    "b85cfd68-3e5d-4c60-9f35-d95d74e3860b": {
+      "hash": "78799e8fd38750cfed681d66ccf55c509a5a5fa9d982e6d5a6a70ef91f61b2df",
+      "operations": {
+        "open_game": {
+          "id": "b85cfd68-3e5d-4c60-9f35-d95d74e3860b:open_game",
+          "status": "ready",
+          "type": "game",
+          "title": "Memory Recall",
+          "detail": "随时返回这里继续对话",
+          "gameId": "memory",
+          "autoOpen": true
+        }
+      },
+      "createdAt": "2026-10-25T07:25:10.341Z",
+      "updatedAt": "2026-10-25T07:25:11.902Z",
+      "response": {
+        "requestId": "b85cfd68-3e5d-4c60-9f35-d95d74e3860b",
+        "reply": "记忆小游戏已打开。祝你玩得开心，随时可以回来继续聊天。",
+        "actions": [
+          {
+            "id": "b85cfd68-3e5d-4c60-9f35-d95d74e3860b:open_game",
+            "status": "ready",
+            "type": "game",
+            "title": "Memory Recall",
+            "detail": "随时返回这里继续对话",
+            "gameId": "memory",
+            "autoOpen": true
+          }
+        ]
+      }
+    },
+    "8722d534-6d0a-4108-964e-99ecb7ffbb82": {
+      "hash": "2195658c956ea32aac8d6c5d8dc4c3dab9fbadda325a6e86da0ff924b60b192f",
+      "operations": {},
+      "createdAt": "2026-10-25T07:25:58.820Z",
+      "response": {
+        "requestId": "8722d534-6d0a-4108-964e-99ecb7ffbb82",
+        "reply": "这种午后困倦和独处的感觉确实容易让人思绪飘远。你愿意多说说此刻的心情吗？是觉得有些孤单，还是享受这份安静？\n\n如果这种感觉让你不太舒服，我们可以试着做几次深呼吸来提神，或者聊聊其他能转移注意力的事情。",
+        "actions": []
+      }
+    },
+    "626ead5f-125b-4f97-ac42-0bacf083310f": {
+      "hash": "77acfab9ef3280eb6ad5b62f3cb5ee4fedd3ea9d326d5c4e25da87186f818fec",
+      "operations": {},
+      "createdAt": "2026-10-25T07:26:07.798Z",
+      "response": {
+        "requestId": "626ead5f-125b-4f97-ac42-0bacf083310f",
+        "reply": "好的，我们一起来做几次深呼吸。\n\n请找一个舒服的姿势坐好或站好：\n1. **吸气**：用鼻子慢慢吸气，感受腹部鼓起，数 4 秒。\n2. **屏息**：轻轻屏住呼吸，数 2 秒。\n3. **呼气**：用嘴巴缓缓呼出，感受身体放松，数 6 秒。\n\n我们可以重复这个过程 3-5 次。做完后，看看困倦感有没有稍微缓解一些？",
+        "actions": []
+      }
+    },
+    "602a845d-671b-40b9-9614-c855f7ebc688": {
+      "hash": "0e8ccf07546cef9a22b9bc02ad8f0a61af55c8961f794883c986706a7d8f1350",
+      "operations": {
+        "open_game": {
+          "id": "602a845d-671b-40b9-9614-c855f7ebc688:open_game",
+          "status": "ready",
+          "type": "game",
+          "title": "Breath Hold",
+          "detail": "随时返回这里继续对话",
+          "gameId": "breath",
+          "autoOpen": true
+        }
+      },
+      "createdAt": "2026-10-25T07:26:26.874Z",
+      "updatedAt": "2026-10-25T07:26:28.727Z",
+      "response": {
+        "requestId": "602a845d-671b-40b9-9614-c855f7ebc688",
+        "reply": "深呼吸练习已打开。你可以跟着屏幕上的引导进行呼吸，这有助于缓解困倦和放松身心。\n\n做完后如果感觉好些了，或者想聊聊刚才那种“像自己呆着”的感觉，随时回来找我。",
+        "actions": [
+          {
+            "id": "602a845d-671b-40b9-9614-c855f7ebc688:open_game",
+            "status": "ready",
+            "type": "game",
+            "title": "Breath Hold",
+            "detail": "随时返回这里继续对话",
+            "gameId": "breath",
+            "autoOpen": true
+          }
+        ]
+      }
+    },
+    "36cfcbe6-799c-4b60-917c-1b1427806e46": {
+      "hash": "78799e8fd38750cfed681d66ccf55c509a5a5fa9d982e6d5a6a70ef91f61b2df",
+      "operations": {
+        "open_game": {
+          "id": "36cfcbe6-799c-4b60-917c-1b1427806e46:open_game",
+          "status": "ready",
+          "type": "game",
+          "title": "Memory Recall",
+          "detail": "练习结束后，可以返回这里继续对话",
+          "gameId": "memory",
+          "autoOpen": true
+        }
+      },
+      "createdAt": "2026-10-25T08:44:18.332Z",
+      "updatedAt": "2026-10-25T08:44:20.209Z",
+      "response": {
+        "requestId": "36cfcbe6-799c-4b60-917c-1b1427806e46",
+        "reply": "已准备好，一起进入记忆小游戏吧。练习结束后，可以返回这里继续对话。",
+        "actions": [
+          {
+            "id": "36cfcbe6-799c-4b60-917c-1b1427806e46:open_game",
+            "status": "ready",
+            "type": "game",
+            "title": "Memory Recall",
+            "detail": "练习结束后，可以返回这里继续对话",
+            "gameId": "memory",
+            "autoOpen": true
+          }
+        ]
+      }
+    },
+    "373b45c0-959a-4166-a78b-752cd9aad9e5": {
+      "hash": "6899fd541ec784a5e15405d05649b09066188c0fcb61863bd1d649179cc78a04",
+      "operations": {},
+      "createdAt": "2026-10-25T08:44:52.984Z",
+      "response": {
+        "requestId": "373b45c0-959a-4166-a78b-752cd9aad9e5",
+        "reply": "我听到了，这种冲动确实很难受。你现在感觉怎么样？是什么触发了这个念头？\n\n我们可以先做几次深呼吸来平复一下情绪，或者玩个小游戏转移注意力。你想试试哪个？",
+        "actions": []
+      }
+    },
+    "8e1024af-a0ad-4479-865e-9d35139edc70": {
+      "hash": "531dd641f9f0dadb4927f91752baf6de4875c6b672cf87000bac130b870ba9fb",
+      "operations": {
+        "start_breathing": {
+          "id": "8e1024af-a0ad-4479-865e-9d35139edc70:start_breathing",
+          "status": "ready",
+          "type": "game",
+          "title": "深呼吸练习",
+          "detail": "练习结束后，可以返回这里继续对话",
+          "gameId": "breath",
+          "autoOpen": true
+        }
+      },
+      "createdAt": "2026-10-25T08:45:00.901Z",
+      "updatedAt": "2026-10-25T08:45:00.904Z",
+      "response": {
+        "requestId": "8e1024af-a0ad-4479-865e-9d35139edc70",
+        "reply": "一起做一次深呼吸练习吧。跟随页面引导，结束后可以回来继续聊。",
+        "actions": [
+          {
+            "id": "8e1024af-a0ad-4479-865e-9d35139edc70:start_breathing",
+            "status": "ready",
+            "type": "game",
+            "title": "深呼吸练习",
+            "detail": "练习结束后，可以返回这里继续对话",
+            "gameId": "breath",
+            "autoOpen": true
+          }
+        ]
+      }
+    },
+    "fb2250b7-b4e5-48eb-9eb6-96254b6cbb55": {
+      "hash": "d5be9414d2020c6284c5e489b020dabd5725d2f982db30f48fea0388e975ab65",
+      "operations": {},
+      "createdAt": "2026-10-25T08:45:19.281Z",
+      "response": {
+        "requestId": "fb2250b7-b4e5-48eb-9eb6-96254b6cbb55",
+        "reply": "我理解你想记录刚才的经历。不过，根据规则，我不能直接把之前的对话自动整理成日记。\n\n如果你愿意，可以告诉我你现在的具体感受、触发因素或者任何想反思的内容，我可以帮你保存为一条新的日记条目。或者，如果刚才的深呼吸或游戏有帮助，也可以分享一下你的体会。\n\n你想记录些什么吗？",
+        "actions": []
+      }
+    },
+    "4dcc82ba-44f4-4eda-8bea-4c246e6b5a40": {
+      "hash": "ef614ba3512c9334952bfeceabcee5a7c7eb0e6bcafd70f20bc6dd6f47880aba",
+      "operations": {
+        "save_journal": {
+          "id": "4dcc82ba-44f4-4eda-8bea-4c246e6b5a40:save_journal",
+          "status": "saved",
+          "type": "journal",
+          "title": "已归入日记",
+          "detail": "用户反馈深呼吸练习帮助排除了杂念。但提到想与之前的女嘉宾（前女友）再联系，这个念头引发了非常强烈的破戒冲动。",
+          "recordId": "c9366a66-39c8-499f-b3c5-413b80af4f06",
+          "route": "journal"
+        }
+      },
+      "createdAt": "2026-10-25T09:19:46.464Z",
+      "updatedAt": "2026-10-25T09:19:50.218Z",
+      "response": {
+        "requestId": "4dcc82ba-44f4-4eda-8bea-4c246e6b5a40",
+        "reply": "已归入日记。\n\n想联系前任确实是一个很强的触发点。这种冲动背后，你是在渴望某种连接、安慰，还是其他什么感觉？\n\n我们可以一起看看，除了联系她，还有没有其他方式可以满足这种需求，同时保护你的康复进程。",
+        "actions": [
+          {
+            "id": "4dcc82ba-44f4-4eda-8bea-4c246e6b5a40:save_journal",
+            "status": "saved",
+            "type": "journal",
+            "title": "已归入日记",
+            "detail": "用户反馈深呼吸练习帮助排除了杂念。但提到想与之前的女嘉宾（前女友）再联系，这个念头引发了非常强烈的破戒冲动。",
+            "recordId": "c9366a66-39c8-499f-b3c5-413b80af4f06",
+            "route": "journal"
+          }
+        ]
+      }
+    },
+    "f441d770-34ca-4236-ba91-8a81768d45e5": {
+      "hash": "9a4df2dc1b5ff9b9e05ab4635b9583372a4e685384dc050c9411b43a64281725",
+      "operations": {},
+      "createdAt": "2026-10-25T09:20:12.887Z",
+      "response": {
+        "requestId": "f441d770-34ca-4236-ba91-8a81768d45e5",
+        "reply": "听到这个消息，我首先想说的是：这并不意味着你失败了，康复是一个过程，偶尔的反复是其中的一部分。重要的是你现在愿意面对它。\n\n为了帮你更好地记录和分析这次情况，我需要确认一下：这是刚刚发生的吗？如果是的话，当时是什么具体的情境或想法触发了这次行为？你现在的感受如何？\n\n请告诉我这些细节，我会帮你记录下来，并一起看看接下来可以怎么做。",
+        "actions": []
+      }
+    }
+  }
 }
