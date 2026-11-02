@@ -4,3 +4,18 @@ tmp
 jobs
 .DS_Store
 .qoder/
+
+# 本地生成的中间素材，不提交
+outputs/
+vibe_images/
+__pycache__/
+*.pyc
+
+# 本地数据文件与 Office 临时文件
+*.xlsx
+~$*
+.~*
+
+# 第三方版权报告，仅本地阅读
+文档/AI报告/a16z-2026-10/*.pdf
+文档/AI报告/a16z-2026-10/*.html

@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { createMeliusService } = require("./melius");
+const { createLessonService } = require("./lessons");
 
 const ROOT_DIR = __dirname;
 loadEnvFile(path.join(ROOT_DIR, ".env"));
@@ -17,6 +18,8 @@ const API_BASE_URL = String(
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const PORT = Number(process.env.PORT || 3000);
 const melius = createMeliusService({ readState: readQuittrState, writeState: writeQuittrState, complete: requestMeliusCompletion });
+
+const lessons = createLessonService({ readState: readQuittrState, writeState: writeQuittrState, complete: requestMeliusCompletion });
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -41,6 +44,10 @@ const server = http.createServer(async (req, res) => {
       return serveFile(res, path.join(STATIC_DIR, "melius-chat.js"), "application/javascript; charset=utf-8");
     }
 
+    if (req.method === "GET" && url.pathname === "/daily-lessons.js") {
+      return serveFile(res, path.join(STATIC_DIR, "daily-lessons.js"), "application/javascript; charset=utf-8");
+    }
+
     if (req.method === "GET" && url.pathname === "/styles.css") {
       return serveFile(res, path.join(STATIC_DIR, "styles.css"), "text/css; charset=utf-8");
     }
@@ -55,6 +62,19 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/api/melius/chat") {
       return await handleMeliusChat(req, res);
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/lessons/daily") {
+      return sendJson(res, 200, lessons.get(url.searchParams.get("timeZone") || "Asia/Shanghai"));
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/lessons/daily") {
+      const body = await readJson(req);
+      return sendJson(res, 200, await lessons.generate(body.timeZone || "Asia/Shanghai", { force: body.regenerate === true }));
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/lessons/complete") {
+      return sendJson(res, 200, lessons.complete(await readJson(req)));
     }
 
     if (req.method === "GET" && url.pathname === "/api/quittr/analytics") {

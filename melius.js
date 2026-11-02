@@ -121,7 +121,7 @@ function createMeliusService({ readState, writeState, complete, now = () => new 
     const previous = readTurn(requestId);
     if (previous && previous.hash !== hash) throw Object.assign(new Error("This message ID was already used for a different request."), { status: 409 });
     if (previous?.response) return previous.response;
-    if (!previous) updateTurn(requestId, { hash, operations: {}, createdAt: now().toISOString() });
+    if (!previous) updateTurn(requestId, { hash, userText: latestText, operations: {}, createdAt: now().toISOString() });
     if (isDirectBreathingRequest(messages)) {
       execute("start_breathing", {}, requestId, latestText);
       const response = { requestId, reply: "一起做一次深呼吸练习吧。跟随页面引导，结束后可以回来继续聊。", actions: Object.values(readTurn(requestId).operations) };

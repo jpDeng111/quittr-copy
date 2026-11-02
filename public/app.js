@@ -604,7 +604,7 @@ class SoundscapeEngine {
 }
 
 function App() {
-  const [page, setPage] = useState("home");
+  const [page, setPage] = useState(() => new URLSearchParams(window.location.search).get("view") === "lessons" ? "course" : "home");
   const [activeTab, setActiveTab] = useState("overview");
   const [lastAction, setLastAction] = useState("");
   const [isPledgeOpen, setIsPledgeOpen] = useState(false);
@@ -629,6 +629,8 @@ function App() {
     return Math.max(0, index);
   });
   const [activeLessonId, setActiveLessonId] = useState(null);
+  const daily = useDailyLessons(clockNow);
+  const [activeDailyLesson, setActiveDailyLesson] = useState(null);
   const [activeGame, setActiveGame] = useState(null);
   const [panicOpen, setPanicOpen] = useState(false);
   const [gameFromPanic, setGameFromPanic] = useState(false);
@@ -1049,15 +1051,15 @@ function App() {
     }
   }
 
-  const hidesBottomNav = ["streak-calendar", "urge", "reset", "reset-triggers", "reset-action", "reset-commit", "reset-final", "journal-entry", "reasons", "blocker", "post-detail", "create-post", "soundscape-player", "lesson-detail", "game"].includes(page);
+  const hidesBottomNav = ["streak-calendar", "urge", "reset", "reset-triggers", "reset-action", "reset-commit", "reset-final", "journal-entry", "reasons", "blocker", "post-detail", "create-post", "soundscape-player", "lesson-detail", "daily-lesson", "game"].includes(page);
 
   return h(
     "main",
-    { className: page === "home" ? "app-shell" : "app-shell page-shell" },
-    page === "home" ? h(HomePage, { onAction: handleAction, journalEntries, analytics, clockNow }) : null,
+    { className: page === "home" ? "app-shell" : `app-shell page-shell${["course", "daily-lesson"].includes(page) ? " classroom-shell" : ""}` },
+    page === "home" ? h(HomePage, { onAction: handleAction, journalEntries, analytics, clockNow, daily }) : null,
     page === "analytics" ? h(AnalyticsPage, { analytics, activeTab, onTab: setActiveTab, onAction: handleAction }) : null,
     page === "streak-calendar" ? h(StreakCalendarPage, { analytics, clockNow, onBack: () => setPage("home") }) : null,
-    page === "library" ? h(LibraryPage, { courseChapters, onAction: handleAction }) : null,
+    page === "library" ? h(LibraryPage, { courseChapters, onAction: handleAction, daily }) : null,
     page === "profile" ? h(ProfilePage, { onAction: handleAction }) : null,
     page === "melius" ? h(MeliusChatPage, { chat, onAction: handleAction, onBack: () => setPage("analytics") }) : null,
     page === "journal" ? h(JournalPage, { entries: journalEntries, onAction: handleAction, onBack: () => setPage("melius") }) : null,
@@ -1074,10 +1076,11 @@ function App() {
     page === "post-detail" ? h(PostDetailPage, { post: communityPostDetail, onAction: handleAction, showToast, setPost: setCommunityPostDetail }) : null,
     page === "create-post" ? h(CreatePostPage, { onAction: handleAction, showToast }) : null,
     page === "soundscape-player" ? h(SoundscapePlayerPage, { soundscape: activeSoundscape, onBack: () => setPage("library") }) : null,
-    page === "course" ? h(CourseOverviewPage, { chapters: courseChapters, activeChapterIdx, setActiveChapterIdx, onAction: handleAction }) : null,
+    page === "course" ? h(DailyClassroomPage, { daily, onOpen: (lesson) => { setActiveDailyLesson(lesson); setPage("daily-lesson"); }, chapters: courseChapters, activeChapterIdx, setActiveChapterIdx, onAction: handleAction }) : null,
+    page === "daily-lesson" && activeDailyLesson ? h(DailyLessonReader, { key: activeDailyLesson.id, lesson: activeDailyLesson, daily, onReplace: setActiveDailyLesson, onBack: () => setPage("course"), onAction: handleAction }) : null,
     page === "lesson-detail" ? h(LessonDetailPage, { lesson: activeLesson, nextLesson, onAction: handleAction }) : null,
     page === "game" ? h(GamePlayPage, { key: gameFromPanic ? "panic" : "library", game: activeGame, fromPanic: gameFromPanic, onSwitch: setActiveGame, onBack: () => { setPage(gameFromPanic ? "home" : gameReturnPage); setGameFromPanic(false); setActiveGame(null); } }) : null,
-    hidesBottomNav ? null : h(BottomNav, { page, onNavigate: navigate }),
+    hidesBottomNav ? null : h(BottomNav, { page: page === "course" ? "library" : page, onNavigate: navigate }),
     isPledgeOpen ? h(PledgeModal, { onClose: () => setIsPledgeOpen(false), onAction: handleAction }) : null,
     isResetConfirmOpen ? h(ResetConfirmDialog, { onAction: handleAction }) : null,
     isRewireModalOpen ? h(RewireModal, { onAction: handleAction }) : null,
@@ -1086,7 +1089,7 @@ function App() {
   );
 }
 
-function HomePage({ onAction, journalEntries, analytics, clockNow }) {
+function HomePage({ onAction, journalEntries, analytics, clockNow, daily }) {
   const homeStats = createHomeStats(analytics, clockNow);
   const currentMilestoneDay = getCurrentMilestoneDay(analytics);
   const milestoneItems = createDayMilestones(currentMilestoneDay);
@@ -1114,6 +1117,7 @@ function HomePage({ onAction, journalEntries, analytics, clockNow }) {
     h("section", { className: "stats-grid", "aria-label": "Recovery stats" }, homeStats.map((item) => h(StatCard, { key: item.label, item, onAction }))),
     h("section", { className: "quick-grid", "aria-label": "Quick actions" }, quickActions.map((item) => h(QuickAction, { key: item.action, item, onAction }))),
     h(ProgressPill, { onAction }),
+    h(DailyLessonTeaser, { daily, onAction, compact: true }),
     h("section", { className: "card-stack", "aria-label": "Support tools" }, cards.map((card) => h(FeatureCard, { key: card.action, card, onAction, journalEntries }))),
     h(QuoteBlock),
     h("button", { className: "panic-button", type: "button", onClick: () => onAction("panic") }, h(Icon, { name: "warning" }), h("span", null, "Panic Button"))
@@ -1597,7 +1601,7 @@ function AnalyticsStats({ stats }) {
   );
 }
 
-function LibraryPage({ courseChapters, onAction }) {
+function LibraryPage({ courseChapters, onAction, daily }) {
   const allLessons = courseChapters.flatMap((chapter) => chapter.lessons);
   const currentIndex = allLessons.findIndex((lesson) => lesson.status === "current");
   const startIndex = currentIndex < 0 ? Math.max(0, allLessons.length - 3) : Math.max(0, currentIndex - 1);
@@ -1612,6 +1616,7 @@ function LibraryPage({ courseChapters, onAction }) {
     { className: "library-page" },
     h("h1", null, "Library"),
     h("section", { className: "library-shortcuts", "aria-label": "Library shortcuts" }, libraryShortcuts.map((item) => h(LibraryShortcut, { key: item.label, item, onAction }))),
+    h(DailyLessonTeaser, { daily, onAction }),
     h(LibraryHeader, { title: "Soundscapes", subtitle: "Relax & drift into a different world to help mitigate urges", action: "soundscapes", onAction }),
     h("section", { className: "soundscape-list", "aria-label": "Soundscapes" }, soundscapes.map((item) => h(SoundscapeButton, { key: item.title, item, onAction }))),
     h("button", { className: "mountain-card", type: "button", onClick: () => onAction("progress mountain") },
