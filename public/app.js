@@ -318,6 +318,7 @@ const courseData = {
 const COURSE_PROGRESS_KEY = "quittr-course-completed-v1";
 
 function loadCompletedLessons() {
+  if (window.QUITTR_ACCOUNT) return window.QUITTR_ACCOUNT.preferences.completedLessonIds || [];
   const allLessons = courseData.chapters.flatMap((chapter) => chapter.lessons);
   const defaults = allLessons.filter((lesson) => lesson.status === "completed").map((lesson) => lesson.id);
   try {
@@ -376,6 +377,7 @@ const gameLevelConfigs = {
 
 const GAME_LEVELS_KEY = "quittr-game-levels";
 function loadGameLevels() {
+  if (window.QUITTR_ACCOUNT) return window.QUITTR_ACCOUNT.preferences.gameLevels || {};
   try { return JSON.parse(localStorage.getItem(GAME_LEVELS_KEY)) || {}; } catch { return {}; }
 }
 function getUnlockedLevel(gameId) {
@@ -388,7 +390,11 @@ function unlockNextLevel(gameId, clearedLevel) {
   const next = Math.min(clearedLevel + 1, GAME_MAX_LEVEL);
   if ((all[gameId] || 1) < next) {
     all[gameId] = next;
-    try { localStorage.setItem(GAME_LEVELS_KEY, JSON.stringify(all)); } catch {}
+    if (window.QUITTR_ACCOUNT) {
+      accountRequest('/api/account/progress', { kind: 'game', id: gameId, level: next }).then(({ preferences }) => {
+        window.QUITTR_ACCOUNT.preferences = preferences;
+      }).catch(() => { window.alert('游戏进度保存失败，请检查连接后再次完成本关。'); });
+    } else { try { localStorage.setItem(GAME_LEVELS_KEY, JSON.stringify(all)); } catch {} }
   }
   return next;
 }
@@ -605,6 +611,10 @@ class SoundscapeEngine {
 
 function App() {
   const [page, setPage] = useState(() => new URLSearchParams(window.location.search).get("view") === "lessons" ? "course" : "home");
+  useEffect(() => {
+    document.documentElement.dataset.page = page;
+    return () => { delete document.documentElement.dataset.page; };
+  }, [page]);
   const [activeTab, setActiveTab] = useState("overview");
   const [lastAction, setLastAction] = useState("");
   const [isPledgeOpen, setIsPledgeOpen] = useState(false);
@@ -636,7 +646,7 @@ function App() {
   const [gameFromPanic, setGameFromPanic] = useState(false);
   const [gameReturnPage, setGameReturnPage] = useState("library");
   const chat = useMeliusConversation(async (actions) => {
-    if (!actions.some((action) => action.type !== "game")) return;
+    if (!actions.some((action) => ["journal", "motivation", "check_in", "urge"].includes(action.type))) return;
     const results = await Promise.allSettled([loadAnalytics(), loadJournalEntries(), loadReasons()]);
     if (results[0].status === "fulfilled") setAnalytics(withClientLoadedAt(results[0].value));
     if (results[1].status === "fulfilled") setJournalEntries(results[1].value);
@@ -649,6 +659,7 @@ function App() {
   const nextLesson = activeLessonIndex >= 0 ? allCourseLessons[activeLessonIndex + 1] || null : null;
 
   useEffect(() => {
+    if (window.QUITTR_ACCOUNT) return;
     try {
       localStorage.setItem(COURSE_PROGRESS_KEY, JSON.stringify(completedLessonIds));
     } catch {
@@ -688,6 +699,8 @@ function App() {
       return;
     }
     if (action === "pledge confirm") {
+      try { await accountRequest('/api/quittr/pledges', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai' }); }
+      catch (error) { showToast(error.message); return; }
       setIsPledgeOpen(false);
       launchConfettiBurst();
       showToast("Pledge complete");
@@ -970,6 +983,12 @@ function App() {
     }
     if (action === "lesson complete") {
       if (activeLesson && activeLesson.status !== "locked") {
+        if (window.QUITTR_ACCOUNT) {
+          try {
+            const { preferences } = await accountRequest('/api/account/progress', { kind: 'course', id: activeLesson.id });
+            window.QUITTR_ACCOUNT.preferences = preferences;
+          } catch (error) { showToast(error.message); return; }
+        }
         setCompletedLessonIds((ids) => ids.includes(activeLesson.id) ? ids : [...ids, activeLesson.id]);
       }
       return;
@@ -1060,7 +1079,7 @@ function App() {
     page === "analytics" ? h(AnalyticsPage, { analytics, activeTab, onTab: setActiveTab, onAction: handleAction }) : null,
     page === "streak-calendar" ? h(StreakCalendarPage, { analytics, clockNow, onBack: () => setPage("home") }) : null,
     page === "library" ? h(LibraryPage, { courseChapters, onAction: handleAction, daily }) : null,
-    page === "profile" ? h(ProfilePage, { onAction: handleAction }) : null,
+    page === "profile" ? h(AccountPanel, { analytics, journalCount: journalEntries.length }) : null,
     page === "melius" ? h(MeliusChatPage, { chat, onAction: handleAction, onBack: () => setPage("analytics") }) : null,
     page === "journal" ? h(JournalPage, { entries: journalEntries, onAction: handleAction, onBack: () => setPage("melius") }) : null,
     page === "urge" ? h(UrgeFlowPage, { flow: urgeFlow, onAction: handleAction }) : null,
@@ -2520,7 +2539,7 @@ function BottomNav({ page, onNavigate }) {
   ];
 
   return h("nav", { className: "bottom-nav", "aria-label": "Main navigation" }, navItems.map((item) =>
-    h("button", { key: item.label, className: page === item.page ? "nav-button is-active" : "nav-button", type: "button", "aria-label": item.label, onClick: () => onNavigate(item.page) }, h(Icon, { name: item.icon }))
+    h("button", { key: item.label, className: page === item.page ? "nav-button is-active" : "nav-button", type: "button", "aria-label": item.label, 'aria-current': page === item.page ? 'page' : undefined, onClick: () => onNavigate(item.page) }, h(Icon, { name: item.icon }), h('span', { className: 'nav-label' }, ({ Home: '首页', Community: '社区', Stats: '统计', Library: '资源', Profile: '我的' })[item.label]))
   ));
 }
 
@@ -2571,7 +2590,7 @@ function FeatureCard({ card, onAction, journalEntries = [] }) {
         card.heading ? h("b", null, latestEntry ? "Today's Reflection" : card.heading) : null,
         latestEntry ? h("span", { className: "journal-preview" }, h("strong", null, latestEntry.title), h("small", null, latestEntry.body || "No details yet")) : h("small", null, card.subtitle)
       ),
-      card.badge ? h("span", { className: "badge" }, entryCount || card.badge) : h("span", { className: "chevron" }, h(Icon, { name: "chevron" }))
+      card.badge ? h("span", { className: "badge" }, isJournal ? entryCount : card.badge) : h("span", { className: "chevron" }, h(Icon, { name: "chevron" }))
     ),
     card.buttonLabel ? h("button", { className: "entry-button", type: "button", onClick: () => onAction("new entry") }, h(Icon, { name: "edit" }), h("span", null, card.buttonLabel)) : null
   );
@@ -2582,7 +2601,7 @@ function QuoteBlock() {
 }
 
 function PledgeModal({ onClose, onAction }) {
-  return h("section", { className: "modal-backdrop", role: "dialog", "aria-modal": "true", "aria-label": "Pledge" }, h("div", { className: "pledge-modal" }, h("button", { className: "modal-close", type: "button", "aria-label": "Close pledge dialog", onClick: onClose }, h(Icon, { name: "close" })), h("h2", { className: "modal-title" }, "Pledge"), h("div", { className: "pledge-hero" }, h("span", { className: "pledge-hand" }, h(Icon, { name: "hand" }))), h("div", { className: "pledge-copy" }, h("h3", null, "Pledge Sobriety Today"), h("p", null, "Make a commitment to yourself not to masturbate for today. You'll receive a notification in 24 hours to check in and see how you did.")), h("section", { className: "pledge-benefits" }, pledgeBenefits.map((item) => h(PledgeBenefit, { key: item.title, item }))), h("button", { className: "pledge-cta", type: "button", onClick: () => onAction("pledge confirm") }, "Pledge Now")));
+  return h("section", { className: "modal-backdrop", role: "dialog", "aria-modal": "true", "aria-label": "Pledge" }, h("div", { className: "pledge-modal" }, h("button", { className: "modal-close", type: "button", "aria-label": "Close pledge dialog", onClick: onClose }, h(Icon, { name: "close" })), h("h2", { className: "modal-title" }, "Pledge"), h("div", { className: "pledge-hero" }, h("span", { className: "pledge-hand" }, h(Icon, { name: "hand" }))), h("div", { className: "pledge-copy" }, h("h3", null, "Pledge Sobriety Today"), h("p", null, "Make a commitment to yourself not to masturbate for today. Your commitment will be saved to your account. Come back tomorrow to check in.")), h("section", { className: "pledge-benefits" }, pledgeBenefits.map((item) => h(PledgeBenefit, { key: item.title, item }))), h("button", { className: "pledge-cta", type: "button", onClick: () => onAction("pledge confirm") }, "Pledge Now")));
 }
 
 function PledgeBenefit({ item }) {
@@ -2970,12 +2989,23 @@ function getResetSelectionCount(review) {
   }, 0);
 }
 
-async function sendMeliusMessage(messages, requestId, signal) {
+async function sendMeliusMessage(messages, requestId, signal, onEvent) {
   const response = await fetch(MELIUS_CHAT_ENDPOINT, {
     method: "POST", signal,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, requestId })
+    body: JSON.stringify({ messages, requestId, stream: true })
   });
+  if (response.ok && response.headers.get("Content-Type")?.includes("text/event-stream")) {
+    let result;
+    await QuittrStream.consumeSSE(response.body, ({ event, data }) => {
+      const value = JSON.parse(data);
+      if (event === "error") { const error = new Error(value.error || "回复中断，请重新发送。"); error.actions = value.actions || []; throw error; }
+      if (event === "done") result = value;
+      else onEvent?.({ type: event, ...value });
+    });
+    if (!result) throw new Error("回复连接中断，请重新发送。已保存的记录不会重复。");
+    return result;
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(data.error || "暂时没有收到回复，请重新发送。");
@@ -3491,7 +3521,7 @@ function RewireModal({ onAction }) {
   );
 }
 
-createRoot(document.getElementById("root")).render(h(App));
+createRoot(document.getElementById("root")).render(h(QuittrRoot));
 
 const blockerAvailableApps = [
   { id: "safari", name: "Safari", category: "Browser" },

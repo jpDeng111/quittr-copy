@@ -4,26 +4,110 @@ const path = require("path");
 const crypto = require("crypto");
 const { createMeliusService } = require("./melius");
 const { createLessonService } = require("./lessons");
+const { readCompletionStream } = require("./public/event-stream");
+const { createStore, current, failure, chatHistory } = require("./storage");
+const { createAuth, publicUser } = require("./auth");
+const { createCommunity } = require("./community");
 
 const ROOT_DIR = __dirname;
 loadEnvFile(path.join(ROOT_DIR, ".env"));
 const STATIC_DIR = path.join(ROOT_DIR, "public");
 const DATA_DIR = process.env.QUITTR_DATA_DIR || path.join(ROOT_DIR, "data");
-const QUITTR_STATE_PATH = path.join(DATA_DIR, "quittr-state.json");
 const MELIUS_MODEL_NAME = process.env.MELIUS_MODEL || "qwen3.7-plus";
+// 课程使用同一套 coding plan 凭据，但模型与超时独立可配。
+const LESSON_MODEL_NAME = process.env.LESSON_MODEL || MELIUS_MODEL_NAME;
+const LESSON_TIMEOUT_MS = Number(process.env.LESSON_TIMEOUT_MS || 60000);
 const API_BASE_URL = String(
   process.env.DASHSCOPE_BASE_URL || "https://coding.dashscope.aliyuncs.com/v1"
 ).replace(/\/+$/, "");
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const PORT = Number(process.env.PORT || 3000);
-const melius = createMeliusService({ readState: readQuittrState, writeState: writeQuittrState, complete: requestMeliusCompletion });
-
-const lessons = createLessonService({ readState: readQuittrState, writeState: writeQuittrState, complete: requestMeliusCompletion });
+const HOST = process.env.HOST || "0.0.0.0";
+const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN ? new URL(process.env.PUBLIC_ORIGIN).origin : "";
+const store = createStore(path.join(DATA_DIR, "quittr.sqlite"));
+const auth = createAuth(store, { secure: PUBLIC_ORIGIN.startsWith("https://"), allowRegistration: process.env.ALLOW_REGISTRATION !== "false" });
+const community = createCommunity(store.db);
+function requestServices() {
+  const context = current();
+  if (!context) throw failure(401, "请先登录。");
+  if (context.services) return context.services;
+  context.services = { melius: createMeliusService({ readState: readQuittrState, writeState: writeQuittrState, complete: requestMeliusCompletion, streamComplete: (payload, { onDelta }) => requestMeliusCompletion({ ...payload, stream: true }, { onDelta, timeoutMs: 60000 }) }),
+    lessons: createLessonService({
+      readState: readQuittrState, writeState: writeQuittrState,
+      complete: payload => requestMeliusCompletion(payload, { model: LESSON_MODEL_NAME, timeoutMs: LESSON_TIMEOUT_MS }),
+      modelName: LESSON_MODEL_NAME,
+      onError: (error, attempt) => console.warn(`[lesson] generation attempt ${attempt + 1} failed: ${error.message}`)
+    }) };
+  return context.services;
+}
+const melius = new Proxy({}, { get: (_, method) => (...args) => requestServices().melius[method](...args) });
+const lessons = new Proxy({}, { get: (_, method) => (...args) => requestServices().lessons[method](...args) });
 
 const server = http.createServer(async (req, res) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "same-origin");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+  res.setHeader("Cache-Control", "no-store");
+  if (PUBLIC_ORIGIN.startsWith("https://")) res.setHeader("Strict-Transport-Security", "max-age=31536000");
+  try {
+    const url = new URL(req.url, "http://localhost");
+    if (req.method === "POST" && url.pathname.startsWith("/api/")) {
+      const expected = PUBLIC_ORIGIN || `http://${req.headers.host}`;
+      if (req.headers.origin ? req.headers.origin !== expected : req.headers["x-quittr-request"] !== "1") throw failure(403, "请求来源无效，请从应用页面操作。");
+      if (req.headers["sec-fetch-site"] === "cross-site") throw failure(403, "请求来源无效。");
+      if (!String(req.headers["content-type"] || "").startsWith("application/json")) throw failure(415, "请使用 JSON 请求。");
+      req.jsonBody = await readJson(req);
+    }
+    const address = req.socket.remoteAddress || "";
+    const isLoopback = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(address);
+    req.clientIp = process.env.TRUST_PROXY === "true" && isLoopback ? String(req.headers["x-forwarded-for"] || address).split(",")[0].trim() : address;
+    if (req.method === "GET" && url.pathname === "/healthz") {
+      store.db.prepare("SELECT 1").get();
+      return sendJson(res, 200, { status: "ok" });
+    }
+    if (url.pathname.startsWith("/api/auth/")) {
+      const action = url.pathname.slice("/api/auth/".length);
+      if (req.method !== (action === "session" ? "GET" : "POST")) return sendJson(res, 405, { error: "Method Not Allowed" });
+      return sendJson(res, 200, await auth.handle(action, req, res, req.jsonBody));
+    }
+    if (url.pathname.startsWith("/api/")) {
+      const user = auth.session(req);
+      if (req.headers["x-quittr-account"] && req.headers["x-quittr-account"] !== user.id) throw failure(401, "账号已切换，请重新登录后操作。");
+      if (req.method === "POST") {
+        auth.limitUser(user.id, "writes", 120, 1);
+        if (url.pathname === "/api/melius/chat") auth.limitUser(user.id, "chat", 12, 1);
+        if (url.pathname === "/api/lessons/daily") auth.limitUser(user.id, "lessons", 6, 10);
+      }
+      return await store.run(user, () => handleRequest(req, res));
+    }
+    await handleRequest(req, res);
+  } catch (error) {
+    if (res.headersSent) { if (!res.writableEnded) res.end(); return; }
+    if (!error.status) console.error("Request failed:", error.message);
+    sendJson(res, error.status || 500, { error: error.status ? error.message : "服务器暂时无法完成请求，请稍后重试。" });
+  }
+});
+
+async function handleRequest(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
+    const mobileAssets = {
+      '/mobile.css': ['mobile.css', 'text/css; charset=utf-8'],
+      '/mobile.js': ['mobile.js', 'application/javascript; charset=utf-8'],
+      '/sw.js': ['sw.js', 'application/javascript; charset=utf-8'],
+      '/offline.html': ['offline.html', 'text/html; charset=utf-8'],
+      '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json'],
+      '/icons/icon.svg': ['icons/icon.svg', 'image/svg+xml'],
+      '/icons/icon-192.png': ['icons/icon-192.png', 'image/png'],
+      '/icons/icon-512.png': ['icons/icon-512.png', 'image/png'],
+      '/icons/apple-touch-icon.png': ['icons/apple-touch-icon.png', 'image/png']
+    };
+    if (req.method === 'GET' && mobileAssets[url.pathname]) {
+      const [filename, contentType] = mobileAssets[url.pathname];
+      return serveFile(res, path.join(STATIC_DIR, filename), contentType);
+    }
 
     if (req.method === "OPTIONS") {
       setCorsHeaders(res);
@@ -38,6 +122,38 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && url.pathname === "/app.js") {
       return serveFile(res, path.join(STATIC_DIR, "app.js"), "application/javascript; charset=utf-8");
+    }
+
+    if (req.method === "GET" && url.pathname === "/auth-client.js") {
+      return serveFile(res, path.join(STATIC_DIR, "auth-client.js"), "application/javascript; charset=utf-8");
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/account/bootstrap") {
+      const state = readQuittrState();
+      return sendJson(res, 200, { user: publicUser(current().user), preferences: state.preferences || {}, chat: chatHistory(state) });
+    }
+    if (req.method === "GET" && url.pathname === "/api/melius/history") {
+      return sendJson(res, 200, chatHistory(readQuittrState(), { before: url.searchParams.get("before"), limit: url.searchParams.get("limit") }));
+    }
+    if (req.method === "GET" && url.pathname === "/api/account/export") {
+      res.setHeader("Content-Disposition", 'attachment; filename="quittr-data.json"');
+      return sendJson(res, 200, { user: publicUser(current().user), exportedAt: new Date().toISOString(), data: { ...readQuittrState(), community: community.exportOwn(current().user.id) } });
+    }
+    if (req.method === "POST" && url.pathname === "/api/account/progress") {
+      const body = await readJson(req);
+      const state = readQuittrState();
+      const preferences = { ...state.preferences };
+      if (body.kind === "course" && typeof body.id === "string" && /^[\w-]{1,100}$/.test(body.id)) {
+        preferences.completedLessonIds = [...new Set([...(preferences.completedLessonIds || []), body.id])];
+      } else if (body.kind === "game" && ["memory", "find", "words", "stroop", "math", "breath"].includes(body.id) && Number.isInteger(body.level) && body.level >= 1 && body.level <= 5) {
+        preferences.gameLevels = { ...preferences.gameLevels, [body.id]: Math.max(preferences.gameLevels?.[body.id] || 1, body.level) };
+      } else return sendJson(res, 400, { error: "无效的进度数据。" });
+      writeQuittrState({ ...state, preferences });
+      return sendJson(res, 200, { preferences });
+    }
+
+    if (req.method === "GET" && url.pathname === "/event-stream.js") {
+      return serveFile(res, path.join(STATIC_DIR, "event-stream.js"), "application/javascript; charset=utf-8");
     }
 
     if (req.method === "GET" && url.pathname === "/melius-chat.js") {
@@ -87,6 +203,21 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/api/quittr/urges") {
       return await handleQuittrUrge(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/quittr/pledges") {
+      const body = await readJson(req);
+      const timeZone = typeof body.timeZone === "string" ? body.timeZone : "Asia/Shanghai";
+      let date;
+      try { date = new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date()); }
+      catch { return sendJson(res, 400, { error: "无效的时区。" }); }
+      const state = readQuittrState();
+      const pledges = state.pledges || [];
+      if (!pledges.some(item => item.date === date && item.timeZone === timeZone)) {
+        pledges.push({ id: crypto.randomUUID(), date, timeZone, createdAt: new Date().toISOString() });
+        writeQuittrState({ ...state, pledges });
+      }
+      return sendJson(res, 200, { pledges });
     }
 
     if (req.method === "GET" && url.pathname === "/api/quittr/journal") {
@@ -158,44 +289,50 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && url.pathname === "/api/community/posts") {
-      return sendJson(res, 200, getCommunityPosts(url.searchParams.get("filter")));
+      return sendJson(res, 200, community.list(current().user.id, url.searchParams.get("filter")));
     }
 
     if (req.method === "POST" && url.pathname === "/api/community/posts") {
-      return await handleCommunityCreatePost(req, res);
+      return sendJson(res, 200, community.create(current().user.id, await readJson(req)));
     }
 
     if (req.method === "GET" && url.pathname === "/api/community/post") {
-      return sendJson(res, 200, getCommunityPost(url.searchParams.get("id")));
+      return sendJson(res, 200, community.get(url.searchParams.get("id"), current().user.id));
     }
 
     if (req.method === "POST" && url.pathname === "/api/community/comment") {
-      return await handleCommunityComment(req, res);
+      return sendJson(res, 200, community.comment(current().user.id, await readJson(req)));
     }
 
     if (req.method === "POST" && url.pathname === "/api/community/like") {
-      return await handleCommunityLike(req, res);
+      return sendJson(res, 200, community.like(current().user.id, await readJson(req)));
     }
 
     sendJson(res, 404, { error: "Not Found" });
   } catch (error) {
-    sendJson(res, 500, { error: getErrorMessage(error) });
+    throw error;
   }
-});
+}
 
-server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  server.listen(PORT, HOST, () => console.log(`Quittr running on ${HOST}:${PORT}; database: ${path.join(DATA_DIR, "quittr.sqlite")}`));
+  for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => {
+    server.close(() => { store.close(); process.exit(0); });
+    const timer = setTimeout(() => process.exit(1), 30000); timer.unref();
+  });
+}
+module.exports = { server, store };
 
-async function requestMeliusCompletion(payload) {
+async function requestMeliusCompletion(payload, { model = MELIUS_MODEL_NAME, timeoutMs = 25000, onDelta } = {}) {
   const apiKey = String(process.env.DASHSCOPE_API_KEY || "").trim();
   if (!apiKey) throw new Error("Missing DASHSCOPE_API_KEY in .env.");
   const response = await fetch(`${API_BASE_URL}/chat/completions`, {
     method: "POST",
-    signal: AbortSignal.timeout(25000),
+    signal: AbortSignal.timeout(timeoutMs),
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: MELIUS_MODEL_NAME, enable_thinking: false, ...payload })
+    body: JSON.stringify({ model, enable_thinking: false, ...payload })
   });
+  if (response.ok && payload.stream) return readCompletionStream(response.body, onDelta);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const detail = data.error?.message || data.message || data.code || response.statusText;
@@ -211,6 +348,22 @@ async function handleMeliusChat(req, res) {
     .map((message) => ({ role: message.role, content: String(message.text || message.content || "").slice(0, 3000) }))
     .filter((message) => message.content.trim()).slice(-12);
   const requestId = typeof body.requestId === "string" ? body.requestId : crypto.randomUUID();
+  if (body.stream === true) {
+    setCorsHeaders(res);
+    res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "Connection": "keep-alive", "X-Accel-Buffering": "no" });
+    res.flushHeaders();
+    const emit = (event, data) => { if (!res.destroyed && !res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+    const heartbeat = setInterval(() => { if (!res.destroyed && !res.writableEnded) res.write(": keepalive\n\n"); }, 12000);
+    res.once("close", () => clearInterval(heartbeat));
+    try {
+      const result = await melius.send({ requestId, messages, onEvent: ({ type, ...data }) => emit(type, data) });
+      emit("done", { ...result, model: MELIUS_MODEL_NAME });
+    } catch (error) {
+      const timedOut = ["TimeoutError", "AbortError"].includes(error.name);
+      emit("error", { error: timedOut ? "回复等待超时，请重新发送。已完成的记录不会重复保存。" : error.message, requestId, actions: melius.savedActions(requestId) });
+    } finally { clearInterval(heartbeat); if (!res.destroyed) res.end(); }
+    return;
+  }
   try {
     const result = await melius.send({ requestId, messages });
     sendJson(res, 200, { ...result, model: MELIUS_MODEL_NAME });
@@ -384,36 +537,15 @@ function buildQuittrAnalytics(now = new Date()) {
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function readQuittrState() {
-  if (!fs.existsSync(QUITTR_STATE_PATH)) {
-    const seeded = createDefaultQuittrState();
-    writeQuittrState(seeded);
-    return seeded;
-  }
-
-  const state = readJsonFile(QUITTR_STATE_PATH);
-  if (!state.startedAt) {
-    const seeded = createDefaultQuittrState();
-    writeQuittrState(seeded);
-    return seeded;
-  }
-
-  return state;
+  if (!current()) throw failure(401, "请先登录。");
+  return structuredClone(current().state);
 }
 
 function writeQuittrState(state) {
-  writeJsonFile(QUITTR_STATE_PATH, {
-    ...state,
-    updatedAt: state.updatedAt || new Date().toISOString()
-  });
-}
-
-function createDefaultQuittrState(now = new Date()) {
-  const day = DAY_MS;
-  return {
-    startedAt: new Date(now.getTime() - 34 * day).toISOString(),
-    relapses: [31, 30, 27, 19, 12, 7].map((daysAgo) => new Date(now.getTime() - daysAgo * day).toISOString()),
-    updatedAt: now.toISOString()
-  };
+  const context = current();
+  if (!context) throw failure(401, "请先登录。");
+  store.write(context.user.id, state);
+  context.state = structuredClone(state);
 }
 
 function normalizeRelapses(relapses, startedAt, now) {
@@ -601,29 +733,6 @@ function extractTextFromDashScope(data) {
   return candidates.map((item) => item.trim()).find(Boolean) || "";
 }
 
-function readJsonFile(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch {
-    return {};
-  }
-}
-
-function writeJsonFile(filePath, payload) {
-  writeTextFileAtomic(filePath, `${JSON.stringify(payload, null, 2)}\n`);
-}
-
-function writeTextFileAtomic(filePath, text) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
-  fs.writeFileSync(tmpPath, text, "utf8");
-  fs.renameSync(tmpPath, filePath);
-}
-
 function sendJson(res, statusCode, payload) {
   setCorsHeaders(res);
   res.writeHead(statusCode, {
@@ -635,27 +744,32 @@ function sendJson(res, statusCode, payload) {
 function serveFile(res, filePath, contentType) {
   const content = fs.readFileSync(filePath);
   setCorsHeaders(res);
-  res.writeHead(200, { "Content-Type": contentType });
+  res.writeHead(200, { "Content-Type": contentType, "Cache-Control": "no-store" });
   res.end(content);
 }
 
 function setCorsHeaders(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Vary", "Origin");
 }
 
 function readJson(req) {
+  if (req.jsonBody !== undefined) return Promise.resolve(req.jsonBody);
   return new Promise((resolve, reject) => {
-    let raw = "";
+    const chunks = [];
+    let bytes = 0;
     req.on("data", (chunk) => {
-      raw += chunk.toString();
+      bytes += chunk.length;
+      if (bytes > 128 * 1024) { reject(failure(413, "请求内容过大。")); return; }
+      chunks.push(chunk);
     });
     req.on("end", () => {
       try {
-        resolve(raw ? JSON.parse(raw) : {});
+        const raw = Buffer.concat(chunks).toString("utf8");
+        const body = raw ? JSON.parse(raw) : {};
+        if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Invalid object");
+        resolve(body);
       } catch (error) {
-        reject(new Error("Invalid JSON request body."));
+        reject(failure(400, "请求 JSON 格式无效。"));
       }
     });
     req.on("error", reject);
@@ -929,235 +1043,4 @@ async function handleBlockerTier3Unlock(req, res) {
   blocker.tier3.passcodeHash = null;
   const updated = writeBlockerState(blocker);
   sendJson(res, 200, updated);
-}
-
-const COMMUNITY_AVATARS = ["🐶", "🐱", "🦊", "🐻", "🐼", "🦁", "🐯", "🐨", "🐸", "🐵", "🦉", "hawk"];
-
-function createDefaultCommunityState(now = new Date()) {
-  const weekAgo = new Date(now.getTime() - 28 * DAY_MS);
-  const posts = [
-    {
-      id: crypto.randomUUID(),
-      author: "Constant Lie",
-      authorAvatar: "🦊",
-      streak: 0,
-      title: "Constant Lie",
-      body: "I do good for a week or so and then lie to myself that one time won't hurt. But it always does. How do you stop the self-deception?",
-      createdAt: new Date(now.getTime() - 28 * DAY_MS).toISOString(),
-      comments: [],
-      likes: 2,
-      likedByMe: false,
-      views: 44
-    },
-    {
-      id: crypto.randomUUID(),
-      author: "Nathan",
-      authorAvatar: "🐶",
-      streak: 14,
-      title: "Peace",
-      body: "Guys... I am so stoked right now. Two weeks clean and I finally feel like myself again. The fog is lifting. If you're struggling right now, keep going. It gets better.",
-      createdAt: new Date(now.getTime() - 21 * DAY_MS).toISOString(),
-      comments: [
-        { id: crypto.randomUUID(), author: "Ian Rent", authorAvatar: "🐻", text: "This is inspiring man, keep it up!", createdAt: new Date(now.getTime() - 20 * DAY_MS).toISOString() }
-      ],
-      likes: 9,
-      likedByMe: false,
-      views: 47
-    },
-    {
-      id: crypto.randomUUID(),
-      author: "Ian Rent",
-      authorAvatar: "🐻",
-      streak: 0,
-      title: "I keep doing it",
-      body: "I've been doing it at least once a day and it's pissing me off but it's a habit now. How do I stop?",
-      createdAt: new Date(now.getTime() - 14 * DAY_MS).toISOString(),
-      comments: [],
-      likes: 0,
-      likedByMe: false,
-      views: 52
-    },
-    {
-      id: crypto.randomUUID(),
-      author: "Rigoberto Reyes",
-      authorAvatar: "🦁",
-      streak: 3,
-      title: "I'm struggling",
-      body: "I'm having a very hard time with this. Every night it's the same battle. Any tips for getting through the late night urges?",
-      createdAt: new Date(now.getTime() - 10 * DAY_MS).toISOString(),
-      comments: [
-        { id: crypto.randomUUID(), author: "Kempa", authorAvatar: "🐼", text: "Cold showers at night helped me a lot. Stay strong brother.", createdAt: new Date(now.getTime() - 9 * DAY_MS).toISOString() }
-      ],
-      likes: 1,
-      likedByMe: false,
-      views: 60
-    },
-    {
-      id: crypto.randomUUID(),
-      author: "Kempa",
-      authorAvatar: "🐼",
-      streak: 0,
-      title: "Need a sex therapist hotline",
-      body: "I can't stop guys I need help. Does anyone know a hotline or resource I can call? I feel like I can't do this alone anymore.",
-      createdAt: new Date(now.getTime() - 7 * DAY_MS).toISOString(),
-      comments: [],
-      likes: 0,
-      likedByMe: false,
-      views: 55
-    },
-    {
-      id: crypto.randomUUID(),
-      author: "Zeke",
-      authorAvatar: "🐯",
-      streak: 15,
-      title: "Day 15",
-      body: "No porn, but I can't stop jerking off. How do I stop? The porn is gone but the habit is still there. Any advice?",
-      createdAt: new Date(now.getTime() - 3 * DAY_MS).toISOString(),
-      comments: [],
-      likes: 0,
-      likedByMe: false,
-      views: 86
-    },
-    {
-      id: crypto.randomUUID(),
-      author: "Anonymous",
-      authorAvatar: "🦉",
-      streak: 7,
-      title: "Don't go on Reddit or X",
-      body: "Seriously, those platforms are full of triggers. Deleted both apps and my urges dropped significantly. Highly recommend.",
-      createdAt: new Date(now.getTime() - 1 * DAY_MS).toISOString(),
-      comments: [],
-      likes: 5,
-      likedByMe: false,
-      views: 32
-    }
-  ];
-  return { posts, updatedAt: now.toISOString() };
-}
-
-function getCommunityState() {
-  const state = readQuittrState();
-  if (!state.community || !Array.isArray(state.community.posts)) {
-    const community = createDefaultCommunityState();
-    writeQuittrState({ ...state, community, updatedAt: new Date().toISOString() });
-    return community;
-  }
-  return state.community;
-}
-
-function writeCommunityState(community) {
-  const state = readQuittrState();
-  const updatedAt = new Date().toISOString();
-  community.updatedAt = updatedAt;
-  writeQuittrState({ ...state, community, updatedAt });
-  return community;
-}
-
-function formatTimeAgo(date) {
-  const diff = Date.now() - new Date(date).getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-  const weeks = Math.floor(diff / 604800000);
-  if (weeks >= 1) return `${weeks}w ago`;
-  if (days >= 1) return `${days}d ago`;
-  if (hours >= 1) return `${hours}h ago`;
-  if (minutes >= 1) return `${minutes}m ago`;
-  return "just now";
-}
-
-function formatPost(post) {
-  return {
-    ...post,
-    timeAgo: formatTimeAgo(post.createdAt),
-    commentCount: (post.comments || []).length
-  };
-}
-
-function getCommunityPosts(filter) {
-  const community = getCommunityState();
-  let posts = (community.posts || []).slice();
-  if (filter === "top") {
-    posts.sort((a, b) => (b.likes || 0) - (a.likes || 0));
-  } else {
-    posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }
-  return { posts: posts.map(formatPost) };
-}
-
-function getCommunityPost(id) {
-  const community = getCommunityState();
-  const post = (community.posts || []).find((p) => p.id === id);
-  if (!post) {
-    return { error: "Post not found" };
-  }
-  post.views = (post.views || 0) + 1;
-  writeCommunityState(community);
-  return { post: formatPost(post) };
-}
-
-async function handleCommunityCreatePost(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const title = String(body.title || "").trim();
-  const postBody = String(body.body || "").trim();
-  if (!title && !postBody) {
-    return sendJson(res, 400, { error: "Post cannot be empty." });
-  }
-  const community = getCommunityState();
-  const avatar = COMMUNITY_AVATARS[Math.floor(Math.random() * COMMUNITY_AVATARS.length)];
-  const post = {
-    id: crypto.randomUUID(),
-    author: "You",
-    authorAvatar: avatar,
-    streak: 0,
-    title: title || "Untitled",
-    body: postBody,
-    createdAt: new Date().toISOString(),
-    comments: [],
-    likes: 0,
-    likedByMe: false,
-    views: 0
-  };
-  community.posts = [post, ...(community.posts || [])];
-  writeCommunityState(community);
-  sendJson(res, 200, { post: formatPost(post) });
-}
-
-async function handleCommunityComment(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const postId = String(body.postId || "").trim();
-  const text = String(body.text || "").trim();
-  if (!text) {
-    return sendJson(res, 400, { error: "Comment cannot be empty." });
-  }
-  const community = getCommunityState();
-  const post = (community.posts || []).find((p) => p.id === postId);
-  if (!post) {
-    return sendJson(res, 404, { error: "Post not found." });
-  }
-  const avatar = COMMUNITY_AVATARS[Math.floor(Math.random() * COMMUNITY_AVATARS.length)];
-  const comment = {
-    id: crypto.randomUUID(),
-    author: "You",
-    authorAvatar: avatar,
-    text,
-    createdAt: new Date().toISOString()
-  };
-  post.comments = [comment, ...(post.comments || [])];
-  writeCommunityState(community);
-  sendJson(res, 200, { post: formatPost(post), comment });
-}
-
-async function handleCommunityLike(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const postId = String(body.postId || "").trim();
-  const community = getCommunityState();
-  const post = (community.posts || []).find((p) => p.id === postId);
-  if (!post) {
-    return sendJson(res, 404, { error: "Post not found." });
-  }
-  post.likedByMe = !post.likedByMe;
-  post.likes = Math.max(0, (post.likes || 0) + (post.likedByMe ? 1 : -1));
-  writeCommunityState(community);
-  sendJson(res, 200, { post: formatPost(post) });
 }

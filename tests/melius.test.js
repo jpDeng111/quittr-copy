@@ -181,3 +181,34 @@ test("contextual language can use the dedicated breathing capability", async () 
   assert.equal(result.actions[0].gameId, "breath");
   assert.equal(f.state().journalEntries, undefined);
 });
+
+const artifact = { kind: 'plan', title: '给今晚留一个收尾', body: '把上线任务缩小，给休息留一点位置。', items: [{ title: '只选一件', body: '挑一个今晚能完成的小改动。' }, { title: '到点收尾', body: '记下下一步，再合上电脑。' }], takeaway: '完成一点，也可以安心休息。' };
+
+test('AI artifacts stream before the final reply and do not create personal records', async () => {
+  const events = [];
+  const f = fixture([call('present_card', artifact), () => {
+    assert.equal(events.at(-1).type, 'card');
+    assert.equal(events.at(-1).card.kind, 'plan');
+    return reply;
+  }]);
+  const result = await f.service.send({ ...request('给我一张今晚的行动卡。'), onEvent: (event) => events.push(event) });
+  assert.equal(result.actions[0].type, 'content_card');
+  assert.equal(result.actions[0].status, 'ready');
+  assert.equal(f.state().journalEntries, undefined);
+  assert.equal(f.state().recoveryCheckIns, undefined);
+  assert.equal(f.state().urges, undefined);
+  assert.deepEqual(f.state().relapses, []);
+  assert.deepEqual(f.state().reasons, ['原有动力']);
+  const cached = await createMeliusService(f.options).send(request('给我一张今晚的行动卡。'));
+  assert.deepEqual(cached.actions, result.actions);
+  assert.equal(f.calls(), 2);
+});
+
+test('incomplete or unknown artifact payloads are rejected without affecting records', async () => {
+  for (const args of [{ ...artifact, kind: 'medical_diagnosis' }, { ...artifact, items: [] }, { ...artifact, items: [{ title: '无正文' }, { title: '不完整' }] }]) {
+    const f = fixture([call('present_card', args), reply]);
+    const result = await f.service.send(request('解释一个概念。'));
+    assert.equal(result.actions.length, 0);
+    assert.equal(f.state().journalEntries, undefined);
+  }
+});

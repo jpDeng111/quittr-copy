@@ -5,6 +5,13 @@ const textField = (description) => ({ type: "string", description });
 const evidenceField = textField("An exact, nonempty quote from the latest user message supporting this action. Never quote a previous turn or invent words.");
 const tool = (name, description, properties, required) => ({ type: "function", function: { name, description, parameters: { type: "object", properties, required, additionalProperties: false } } });
 const MELIUS_TOOLS = [
+  tool("present_card", "Create one polished in-chat artifact when a concrete plan, explanation, or reflection would help. This is an AI suggestion, NOT a personal record or a completed action. Use for explicit card requests and useful structured advice. Do not use for greetings, simple acknowledgements, or requests to actually open an exercise/game. Never invent personal facts, diagnoses, scores, percentages, achievements or study results. Use the user's language; concise copy.", {
+    kind: { type: "string", enum: ["plan", "insight", "reflection"] },
+    title: textField("A specific helpful title, at most 14 Chinese characters or 8 English words"),
+    body: textField("One short sentence introducing this card, no more than 45 Chinese characters"),
+    items: { type: "array", minItems: 2, maxItems: 4, items: { type: "object", properties: { title: textField("A short step or idea, at most 8 Chinese characters"), body: textField("One concrete explanation, at most 30 Chinese characters") }, required: ["title", "body"], additionalProperties: false } },
+    takeaway: textField("One warm actionable takeaway, at most 30 Chinese characters")
+  }, ["kind", "title", "body", "items", "takeaway"]),
   tool("save_journal", "Archive a meaningful personal reflection from the user. Do not archive greetings, questions, examples, or instructions. Check-ins and motivations already create journal entries, so do not duplicate those with this tool.", {
     title: textField("Short title in the user's language"), body: textField("Faithful concise summary, without invented facts"),
     mood: textField("Only emotions explicitly stated by the user, otherwise empty"), source_quote: evidenceField
@@ -39,7 +46,7 @@ function isDirectBreathingRequest(messages) {
   return correction.test(text) && messages.slice(0, -1).filter((message) => message.role === "user").slice(-2).some((message) => command.test(normalize(message.content)));
 }
 
-function createMeliusService({ readState, writeState, complete, now = () => new Date() }) {
+function createMeliusService({ readState, writeState, complete, streamComplete, now = () => new Date() }) {
   const inFlight = new Map();
   const clean = (value, max = 3000) => typeof value === "string" ? value.trim().slice(0, max) : "";
   const readTurn = (id) => readState().meliusTurns?.[id];
@@ -56,7 +63,7 @@ function createMeliusService({ readState, writeState, complete, now = () => new 
     const turn = state.meliusTurns[id];
     if (turn.operations?.[name]) return turn.operations[name];
     const quote = clean(args.source_quote);
-    if (!["open_game", "start_breathing"].includes(name) && (!quote || !userText.includes(quote))) throw new Error("No exact evidence in the latest message. Ask the user to clarify; nothing was recorded.");
+    if (!["open_game", "start_breathing", "present_card"].includes(name) && (!quote || !userText.includes(quote))) throw new Error("No exact evidence in the latest message. Ask the user to clarify; nothing was recorded.");
     const timestamp = now().toISOString();
     const source = { source: "melius", sourceMessageId: id, sourceQuote: quote };
     const result = { id: `${id}:${name}`, status: "saved" };
@@ -66,7 +73,13 @@ function createMeliusService({ readState, writeState, complete, now = () => new 
       changes.journalEntries = [saved, ...(state.journalEntries || [])];
       return saved;
     }
-    if (name === "save_journal") {
+    if (name === "present_card") {
+      if (!["plan", "insight", "reflection"].includes(args.kind)) throw new Error("Unknown card kind");
+      const items = Array.isArray(args.items) ? args.items.slice(0, 4).map((item) => ({ title: clean(item?.title, 48), body: clean(item?.body, 120) })) : [];
+      const title = clean(args.title, 80), body = clean(args.body, 200), takeaway = clean(args.takeaway, 120);
+      if (!title || !body || !takeaway || items.length < 2 || items.some((item) => !item.title || !item.body)) throw new Error("Incomplete card; supply a title, introduction, 2–4 useful items and takeaway.");
+      Object.assign(result, { type: "content_card", status: "ready", kind: args.kind, title, body, items, takeaway });
+    } else if (name === "save_journal") {
       const body = clean(args.body);
       if (!body) throw new Error("Journal text is empty");
       const entry = journal({ title: clean(args.title, 120) || "对话随记", body, category: "reflection", mood: clean(args.mood, 100) });
@@ -116,20 +129,22 @@ function createMeliusService({ readState, writeState, complete, now = () => new 
     return result;
   }
 
-  async function run(requestId, messages, hash) {
+  async function run(requestId, messages, hash, emit) {
     const latestText = messages[messages.length - 1].content;
     const previous = readTurn(requestId);
     if (previous && previous.hash !== hash) throw Object.assign(new Error("This message ID was already used for a different request."), { status: 409 });
     if (previous?.response) return previous.response;
-    if (!previous) updateTurn(requestId, { hash, userText: latestText, operations: {}, createdAt: now().toISOString() });
+    if (!previous) updateTurn(requestId, { hash, userText: latestText, context: messages.map(({ role, content }) => ({ role, text: content })), operations: {}, createdAt: now().toISOString() });
     if (isDirectBreathingRequest(messages)) {
       execute("start_breathing", {}, requestId, latestText);
       const response = { requestId, reply: "一起做一次深呼吸练习吧。跟随页面引导，结束后可以回来继续聊。", actions: Object.values(readTurn(requestId).operations) };
       updateTurn(requestId, { response });
+      emit?.({ type: "delta", text: response.reply });
       return response;
     }
     const chat = [{ role: "system", content: [
       "You are Melius, a warm, concise recovery companion inside a local wellbeing app. Match the user's language and avoid shame or medical diagnoses.",
+      "Your output can include beautiful cards inside this conversation via present_card. For explicit card requests, step-by-step plans, substantive explanations or thoughtful reflections, use present_card to deliver a compact reusable artifact. The card is the main output: after preparing it, reply with only one or two warm sentences, without repeating its items. Ordinary conversation stays conversational. Card suggestions are not records, promises, completed actions or evidence that the user tried them. Never save a suggestion as a journal/check-in. Do not invent medical claims, metrics or certainty about the user's motives. Actual requests to do breathing or open games must use their existing activity tools, not just a card.",
       "You can call app tools. When the latest user message contains a meaningful personal reflection, a stated motivation, an actual relapse, explicitly staying clean, or a present urge, use the matching tool to organize it automatically. Questions, greetings, quoted examples, test scenarios and hypothetical statements are NOT personal events and must not be saved.",
       "Distinguish 'I relapsed' from 'I might relapse', 'almost relapsed', and 'did not relapse'. Only record an actual relapse when explicit. If the wording or event time is ambiguous, ask one short clarification. Never invent feelings, triggers, intensity, event times or next steps.",
       "Do not record the same event from an earlier conversation turn again. Follow-up feelings about a previously recorded relapse can be saved with save_journal instead of record_check_in. save_motivation and record_check_in already create journal entries; do not duplicate them with save_journal.",
@@ -140,7 +155,8 @@ function createMeliusService({ readState, writeState, complete, now = () => new 
       `Current time: ${now().toISOString()}; user timezone: Asia/Shanghai. Actions already completed for this same retry: ${JSON.stringify(Object.values(readTurn(requestId)?.operations || {}))}. Repeating the same tool will return its saved result without another write.`
     ].join(" ") }, ...messages];
     for (let round = 0; round < 4; round += 1) {
-      const data = await complete({ messages: chat, tools: MELIUS_TOOLS, tool_choice: round === 3 ? "none" : "auto", temperature: 0.4 });
+      const completion = emit && streamComplete ? streamComplete : complete;
+      const data = await completion({ messages: chat, tools: MELIUS_TOOLS, tool_choice: round === 3 ? "none" : "auto", temperature: 0.4 }, { onDelta: (text) => emit?.({ type: "delta", text }) });
       const message = data.choices?.[0]?.message;
       if (!message) throw new Error("Melius did not return a message. Please retry.");
       const calls = Array.isArray(message.tool_calls) ? message.tool_calls.slice(0, 8) : [];
@@ -151,11 +167,15 @@ function createMeliusService({ readState, writeState, complete, now = () => new 
         updateTurn(requestId, { response });
         return response;
       }
+      emit?.({ type: "reset" });
       if (round === 3) throw new Error("Melius has not finished its response. Please retry.");
       chat.push({ role: "assistant", content: message.content || "", tool_calls: calls });
       for (const call of calls) {
         let result;
-        try { result = execute(call.function?.name, JSON.parse(call.function?.arguments || "{}"), requestId, latestText); }
+        try {
+          result = execute(call.function?.name, JSON.parse(call.function?.arguments || "{}"), requestId, latestText);
+          if (result.type === "content_card") emit?.({ type: "card", card: result });
+        }
         catch (error) { result = { status: "not_saved", error: error.message }; }
         chat.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
       }
@@ -163,18 +183,26 @@ function createMeliusService({ readState, writeState, complete, now = () => new 
   }
 
   return {
-    async send({ requestId, messages }) {
+    async send({ requestId, messages, onEvent }) {
       if (!/^[\w-]{8,128}$/.test(requestId || "")) throw Object.assign(new Error("Invalid message ID"), { status: 400 });
       if (!messages.length || messages[messages.length - 1].role !== "user") throw Object.assign(new Error("The last message must be from the user"), { status: 400 });
       const hash = crypto.createHash("sha256").update(JSON.stringify(messages)).digest("hex");
       const running = inFlight.get(requestId);
       if (running) {
         if (running.hash !== hash) throw Object.assign(new Error("Message ID conflicts with an active request"), { status: 409 });
-        return running.promise;
+        if (typeof onEvent !== "function") return running.promise;
+        for (const event of running.events) onEvent(event);
+        running.listeners.add(onEvent);
+        try { return await running.promise; } finally { running.listeners.delete(onEvent); }
       }
-      const promise = run(requestId, messages, hash).finally(() => inFlight.delete(requestId));
-      inFlight.set(requestId, { hash, promise });
-      return promise;
+      const entry = { hash, listeners: new Set(typeof onEvent === "function" ? [onEvent] : []), events: [] };
+      const emit = (event) => {
+        entry.events.push(event);
+        for (const listener of entry.listeners) { try { listener(event); } catch { /* A disconnected reader must not undo saved actions. */ } }
+      };
+      inFlight.set(requestId, entry);
+      entry.promise = run(requestId, messages, hash, typeof onEvent === "function" ? emit : undefined).finally(() => inFlight.delete(requestId));
+      return entry.promise;
     },
     savedActions(requestId) { return Object.values(readTurn(requestId)?.operations || {}); }
   };

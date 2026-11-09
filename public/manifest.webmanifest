@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "Quittr · 你的恢复空间",
+  "short_name": "Quittr",
+  "description": "日记、恢复记录和 Melius 对话，随账号保存。",
+  "lang": "zh-CN",
+  "start_url": "/?source=homescreen",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#070808",
+  "theme_color": "#070808",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

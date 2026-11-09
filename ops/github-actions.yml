@@ -1,0 +1,21 @@
+name: Quittr checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.13.0'
+      - run: npm test
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile iOS simulator app
+        run: xcodebuild -project ios/Quittr.xcodeproj -scheme Quittr -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/quittr-derived CODE_SIGNING_ALLOWED=NO build

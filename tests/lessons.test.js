@@ -207,3 +207,50 @@ test('a reader can complete the old revision after a newer lesson was generated'
   assert.equal(f.service.get().lesson.completedAt, undefined);
   assert.equal(f.service.get().history[0].intention, '喝水');
 });
+
+test('materials fall back to a wider window when yesterday is empty, and the prompt says so', async () => {
+  const f = fixture({ journalEntries: [{ createdAt: '2026-10-28T10:00:00Z', title: '六天前的日记', body: '晚上一个人吃饭，很想找点刺激。' }] }, async (payload) => {
+    const sent = JSON.parse(payload.messages[1].content);
+    assert.equal(sent.windowDays, 14);
+    assert.match(sent.journals[0].title, /六天前的日记/);
+    assert.match(payload.messages[0].content, /最近 14 天/);
+    assert.doesNotMatch(payload.messages[0].content, /素材窗口：昨天/);
+    return generated();
+  });
+  const result = await f.service.generate();
+  assert.equal(result.lesson.hasActivity, true);
+  assert.equal(result.lesson.windowDays, 14);
+  assert.deepEqual(result.lesson.sources, ['最近 14 天1 条日记']);
+});
+
+test('a completed curated lesson becomes a personalized AI lesson without manual regeneration', async () => {
+  const f = fixture();
+  const starter = f.service.get().lesson;
+  f.service.complete({ id: starter.id, origin: 'starter', intention: starter.cards[4].steps[0] });
+  assert.equal(f.service.get().lesson.origin, 'starter');
+  const result = await f.service.generate();
+  assert.equal(result.lesson.origin, 'ai');
+  assert.notEqual(result.lesson.id, starter.id);
+  assert.equal(result.lesson.completedAt, undefined);
+  assert.equal(result.history[0].origin, 'starter');
+  assert.equal(result.history[0].intention, starter.cards[4].steps[0]);
+  // Once an AI lesson exists for today, loading the app does not call the model again.
+  await f.service.generate();
+  assert.equal(f.calls(), 1);
+});
+
+test('one malformed response is retried before falling back to curated content', async () => {
+  let round = 0;
+  const f = fixture({}, () => { round += 1; if (round === 1) throw new Error('truncated json'); return generated(); });
+  const result = await f.service.generate();
+  assert.equal(f.calls(), 2);
+  assert.equal(result.lesson.origin, 'ai');
+  assert.equal(result.generationError, undefined);
+});
+
+test('generated lessons record the model that wrote them', async () => {
+  const f = fixture();
+  const service = createLessonService({ ...f.options, modelName: 'qwen3.7-plus' });
+  const result = await service.generate();
+  assert.equal(result.lesson.model, 'qwen3.7-plus');
+});

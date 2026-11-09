@@ -1,0 +1,2 @@
+// HTTP is limited by validatedOrigin to private/local hosts in DEBUG builds.
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG $(inherited)
