@@ -51,8 +51,9 @@ final class QuittrWebModel: NSObject, ObservableObject, WKNavigationDelegate, WK
               parts.path.isEmpty || parts.path == "/" else { throw Invalid() }
         var allowed = scheme == "https"
         #if DEBUG
-        let segments = host.split(separator: ".").compactMap { Int($0) }
-        let privateIP = segments.count == 4 && segments.allSatisfy { (0...255).contains($0) } &&
+        let pieces = host.split(separator: ".", omittingEmptySubsequences: false)
+        let segments = pieces.compactMap { Int($0) }
+        let privateIP = pieces.count == 4 && segments.count == 4 && segments.allSatisfy { (0...255).contains($0) } &&
             (segments[0] == 10 || segments[0] == 127 || (segments[0] == 192 && segments[1] == 168) || (segments[0] == 172 && (16...31).contains(segments[1])))
         allowed = allowed || (scheme == "http" && (privateIP || host == "localhost" || host == "::1" || host.hasSuffix(".local")))
         #endif
