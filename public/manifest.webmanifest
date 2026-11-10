@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "轻甜 · 工作日减糖陪伴",
+  "short_name": "轻甜",
+  "description": "饮食小记、渴望暂停与每日回顾，按自己的节奏减少添加糖。",
+  "lang": "zh-CN",
+  "start_url": "/?source=homescreen",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f6f1",
+  "theme_color": "#f7f6f1",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

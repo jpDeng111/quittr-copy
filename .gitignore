@@ -15,6 +15,17 @@ __pycache__/
 *.xlsx
 ~$*
 .~*
+data/*.sqlite*
+data/backups/
+data/server.log
+data/service.err.log
+data/com.quittr.server.plist
+data/quittr-state.json
+.workbuddy/
+ios/**/xcuserdata/
+ios/build/
+ios/DerivedData/
+*.xcuserstate
 
 # 第三方版权报告，仅本地阅读
 文档/AI报告/a16z-2026-10/*.pdf

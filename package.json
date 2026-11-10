@@ -1,10 +1,14 @@
 {
-  "name": "quittr-dashboard",
+  "name": "qingtian-sugar-companion",
   "version": "1.0.0",
-  "description": "Local Quittr recovery progress dashboard with Melius AI chat",
+  "description": "Light Sweet: a self-hosted workday sugar-reduction companion",
+  "engines": { "node": ">=24.13.0 <25" },
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "backup": "node scripts/admin.js backup",
+    "admin": "node scripts/admin.js",
+    "service:config": "node scripts/service-config.js"
   }
 }

@@ -4,26 +4,112 @@ const path = require("path");
 const crypto = require("crypto");
 const { createMeliusService } = require("./melius");
 const { createLessonService } = require("./lessons");
+const { readCompletionStream } = require("./public/event-stream");
+const { createStore, current, failure, chatHistory } = require("./storage");
+const { createAuth, publicUser } = require("./auth");
+const { createCommunity } = require("./community");
+const { initialSugar, addSugarLog, addCraving, checkIn, setPreferences, summary, dateKey } = require('./sugar');
 
 const ROOT_DIR = __dirname;
 loadEnvFile(path.join(ROOT_DIR, ".env"));
 const STATIC_DIR = path.join(ROOT_DIR, "public");
 const DATA_DIR = process.env.QUITTR_DATA_DIR || path.join(ROOT_DIR, "data");
-const QUITTR_STATE_PATH = path.join(DATA_DIR, "quittr-state.json");
 const MELIUS_MODEL_NAME = process.env.MELIUS_MODEL || "qwen3.7-plus";
+// 课程使用同一套 coding plan 凭据，但模型与超时独立可配。
+const LESSON_MODEL_NAME = process.env.LESSON_MODEL || MELIUS_MODEL_NAME;
+const LESSON_TIMEOUT_MS = Number(process.env.LESSON_TIMEOUT_MS || 60000);
 const API_BASE_URL = String(
   process.env.DASHSCOPE_BASE_URL || "https://coding.dashscope.aliyuncs.com/v1"
 ).replace(/\/+$/, "");
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const PORT = Number(process.env.PORT || 3000);
-const melius = createMeliusService({ readState: readQuittrState, writeState: writeQuittrState, complete: requestMeliusCompletion });
-
-const lessons = createLessonService({ readState: readQuittrState, writeState: writeQuittrState, complete: requestMeliusCompletion });
+const HOST = process.env.HOST || "0.0.0.0";
+const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN ? new URL(process.env.PUBLIC_ORIGIN).origin : "";
+const store = createStore(path.join(DATA_DIR, "quittr.sqlite"));
+const auth = createAuth(store, { secure: PUBLIC_ORIGIN.startsWith("https://"), allowRegistration: process.env.ALLOW_REGISTRATION !== "false" });
+const community = createCommunity(store.db);
+function requestServices() {
+  const context = current();
+  if (!context) throw failure(401, "请先登录。");
+  if (context.services) return context.services;
+  context.services = { melius: createMeliusService({ domain: 'sugar', readState: readSugarState, writeState: writeSugarState, complete: requestMeliusCompletion, streamComplete: (payload, { onDelta }) => requestMeliusCompletion({ ...payload, stream: true }, { onDelta, timeoutMs: 60000 }) }),
+    lessons: createLessonService({
+      domain: 'sugar', readState: readSugarState, writeState: writeSugarState,
+      complete: payload => requestMeliusCompletion(payload, { model: LESSON_MODEL_NAME, timeoutMs: LESSON_TIMEOUT_MS }),
+      modelName: LESSON_MODEL_NAME,
+      onError: (error, attempt) => console.warn(`[lesson] generation attempt ${attempt + 1} failed: ${error.message}`)
+    }) };
+  return context.services;
+}
+const melius = new Proxy({}, { get: (_, method) => (...args) => requestServices().melius[method](...args) });
+const lessons = new Proxy({}, { get: (_, method) => (...args) => requestServices().lessons[method](...args) });
 
 const server = http.createServer(async (req, res) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "same-origin");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+  res.setHeader("Cache-Control", "no-store");
+  if (PUBLIC_ORIGIN.startsWith("https://")) res.setHeader("Strict-Transport-Security", "max-age=31536000");
+  try {
+    const url = new URL(req.url, "http://localhost");
+    if (req.method === "POST" && url.pathname.startsWith("/api/")) {
+      const expected = PUBLIC_ORIGIN || `http://${req.headers.host}`;
+      if (req.headers.origin ? req.headers.origin !== expected : req.headers["x-quittr-request"] !== "1") throw failure(403, "请求来源无效，请从应用页面操作。");
+      if (req.headers["sec-fetch-site"] === "cross-site") throw failure(403, "请求来源无效。");
+      if (!String(req.headers["content-type"] || "").startsWith("application/json")) throw failure(415, "请使用 JSON 请求。");
+      req.jsonBody = await readJson(req);
+    }
+    const address = req.socket.remoteAddress || "";
+    const isLoopback = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(address);
+    req.clientIp = process.env.TRUST_PROXY === "true" && isLoopback ? String(req.headers["x-forwarded-for"] || address).split(",")[0].trim() : address;
+    if (req.method === "GET" && url.pathname === "/healthz") {
+      store.db.prepare("SELECT 1").get();
+      return sendJson(res, 200, { status: "ok" });
+    }
+    if (url.pathname.startsWith("/api/auth/")) {
+      const action = url.pathname.slice("/api/auth/".length);
+      if (req.method !== (action === "session" ? "GET" : "POST")) return sendJson(res, 405, { error: "Method Not Allowed" });
+      return sendJson(res, 200, await auth.handle(action, req, res, req.jsonBody));
+    }
+    if (url.pathname.startsWith("/api/")) {
+      const user = auth.session(req);
+      if (req.headers["x-quittr-account"] && req.headers["x-quittr-account"] !== user.id) throw failure(401, "账号已切换，请重新登录后操作。");
+      if (req.method === "POST") {
+        auth.limitUser(user.id, "writes", 120, 1);
+        if (url.pathname === "/api/melius/chat") auth.limitUser(user.id, "chat", 12, 1);
+        if (url.pathname === "/api/lessons/daily") auth.limitUser(user.id, "lessons", 6, 10);
+      }
+      return await store.run(user, () => handleRequest(req, res));
+    }
+    await handleRequest(req, res);
+  } catch (error) {
+    if (res.headersSent) { if (!res.writableEnded) res.end(); return; }
+    if (!error.status) console.error("Request failed:", error.message);
+    sendJson(res, error.status || 500, { error: error.status ? error.message : "服务器暂时无法完成请求，请稍后重试。" });
+  }
+});
+
+async function handleRequest(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
+    if (url.pathname.startsWith('/api/blocker/') || url.pathname === '/api/quittr/relapses') return sendJson(res, 410, { error: '此功能已随轻甜减糖版停用。旧数据仍保留，可在个人数据导出中查看。' });
+    const mobileAssets = {
+      '/mobile.css': ['mobile.css', 'text/css; charset=utf-8'],
+      '/mobile.js': ['mobile.js', 'application/javascript; charset=utf-8'],
+      '/sw.js': ['sw.js', 'application/javascript; charset=utf-8'],
+      '/offline.html': ['offline.html', 'text/html; charset=utf-8'],
+      '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json'],
+      '/icons/icon.svg': ['icons/icon.svg', 'image/svg+xml'],
+      '/icons/icon-192.png': ['icons/icon-192.png', 'image/png'],
+      '/icons/icon-512.png': ['icons/icon-512.png', 'image/png'],
+      '/icons/apple-touch-icon.png': ['icons/apple-touch-icon.png', 'image/png']
+    };
+    if (req.method === 'GET' && mobileAssets[url.pathname]) {
+      const [filename, contentType] = mobileAssets[url.pathname];
+      return serveFile(res, path.join(STATIC_DIR, filename), contentType);
+    }
 
     if (req.method === "OPTIONS") {
       setCorsHeaders(res);
@@ -38,6 +124,67 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && url.pathname === "/app.js") {
       return serveFile(res, path.join(STATIC_DIR, "app.js"), "application/javascript; charset=utf-8");
+    }
+
+    if (req.method === "GET" && url.pathname === "/auth-client.js") {
+      return serveFile(res, path.join(STATIC_DIR, "auth-client.js"), "application/javascript; charset=utf-8");
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/account/bootstrap") {
+      const state = readSugarState();
+      return sendJson(res, 200, { user: publicUser(current().user), preferences: readQuittrState().preferences || {}, chat: chatHistory(state) });
+    }
+    if (req.method === "GET" && url.pathname === "/api/melius/history") {
+      return sendJson(res, 200, chatHistory(readSugarState(), { before: url.searchParams.get("before"), limit: url.searchParams.get("limit") }));
+    }
+    if (req.method === 'GET' && url.pathname === '/api/sugar/state') return sendJson(res, 200, summary(readSugarState(), url.searchParams.get('timeZone') || 'Asia/Shanghai'));
+    if (req.method === 'GET' && url.pathname === '/api/sugar/journal') return sendJson(res, 200, { entries: readSugarState().journalEntries });
+    if (req.method === 'POST' && url.pathname === '/api/sugar/journal') {
+      const body = await readJson(req);
+      const state = readSugarState();
+      const content = String(body.body || '').trim().slice(0, 5000);
+      if (!content) return sendJson(res, 400, { error: '写下一点感受再保存吧。' });
+      if (!/^[\w-]{8,128}$/.test(body.clientId || '')) return sendJson(res, 400, { error: '记录标识无效。' });
+      const previous = state.journalEntries.find(entry => entry.clientId === body.clientId);
+      const title = String(body.title || '').trim().slice(0, 100) || '工作日的一小页';
+      if (previous && (previous.body !== content || previous.title !== title)) return sendJson(res, 409, { error: '记录标识已使用，请重新打开表单。' });
+      const entry = previous || { id: crypto.randomUUID(), clientId: body.clientId, title, body: content, category: 'reflection', createdAt: new Date().toISOString() };
+      if (!previous) writeSugarState({ ...state, journalEntries: [entry, ...state.journalEntries] });
+      return sendJson(res, 200, { entry });
+    }
+    if (req.method === 'POST' && ['/api/sugar/logs', '/api/sugar/cravings', '/api/sugar/check-in', '/api/sugar/preferences'].includes(url.pathname)) {
+      const body = await readJson(req);
+      const timeZone = body.timeZone || 'Asia/Shanghai';
+      dateKey(new Date(), timeZone);
+      const state = readSugarState();
+      let next, entry;
+      if (url.pathname.endsWith('/preferences')) next = setPreferences(state, body);
+      else {
+        const result = url.pathname.endsWith('/logs') ? addSugarLog(state, body) : url.pathname.endsWith('/cravings') ? addCraving(state, body) : checkIn(state, body);
+        next = result.state; entry = result.entry;
+      }
+      writeSugarState(next);
+      return sendJson(res, 200, { entry, summary: summary(next, timeZone) });
+    }
+    if (req.method === "GET" && url.pathname === "/api/account/export") {
+      res.setHeader("Content-Disposition", 'attachment; filename="quittr-data.json"');
+      return sendJson(res, 200, { user: publicUser(current().user), exportedAt: new Date().toISOString(), data: { ...readQuittrState(), community: community.exportOwn(current().user.id) } });
+    }
+    if (req.method === "POST" && url.pathname === "/api/account/progress") {
+      const body = await readJson(req);
+      const state = readQuittrState();
+      const preferences = { ...state.preferences };
+      if (body.kind === "course" && typeof body.id === "string" && /^[\w-]{1,100}$/.test(body.id)) {
+        preferences.completedLessonIds = [...new Set([...(preferences.completedLessonIds || []), body.id])];
+      } else if (body.kind === "game" && ["memory", "find", "words", "stroop", "math", "breath"].includes(body.id) && Number.isInteger(body.level) && body.level >= 1 && body.level <= 5) {
+        preferences.gameLevels = { ...preferences.gameLevels, [body.id]: Math.max(preferences.gameLevels?.[body.id] || 1, body.level) };
+      } else return sendJson(res, 400, { error: "无效的进度数据。" });
+      writeQuittrState({ ...state, preferences });
+      return sendJson(res, 200, { preferences });
+    }
+
+    if (req.method === "GET" && url.pathname === "/event-stream.js") {
+      return serveFile(res, path.join(STATIC_DIR, "event-stream.js"), "application/javascript; charset=utf-8");
     }
 
     if (req.method === "GET" && url.pathname === "/melius-chat.js") {
@@ -89,6 +236,21 @@ const server = http.createServer(async (req, res) => {
       return await handleQuittrUrge(req, res);
     }
 
+    if (req.method === "POST" && url.pathname === "/api/quittr/pledges") {
+      const body = await readJson(req);
+      const timeZone = typeof body.timeZone === "string" ? body.timeZone : "Asia/Shanghai";
+      let date;
+      try { date = new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date()); }
+      catch { return sendJson(res, 400, { error: "无效的时区。" }); }
+      const state = readQuittrState();
+      const pledges = state.pledges || [];
+      if (!pledges.some(item => item.date === date && item.timeZone === timeZone)) {
+        pledges.push({ id: crypto.randomUUID(), date, timeZone, createdAt: new Date().toISOString() });
+        writeQuittrState({ ...state, pledges });
+      }
+      return sendJson(res, 200, { pledges });
+    }
+
     if (req.method === "GET" && url.pathname === "/api/quittr/journal") {
       return sendJson(res, 200, { entries: getJournalEntries() });
     }
@@ -105,97 +267,51 @@ const server = http.createServer(async (req, res) => {
       return await handleQuittrReasons(req, res);
     }
 
-    if (req.method === "GET" && url.pathname === "/api/blocker/state") {
-      return sendJson(res, 200, getBlockerState());
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/protection") {
-      return await handleBlockerProtection(req, res);
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/tier1") {
-      return await handleBlockerTier1(req, res);
-    }
-
-    if (req.method === "GET" && url.pathname === "/api/blocker/websites") {
-      return sendJson(res, 200, { websites: getBlockerWebsites() });
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/websites") {
-      return await handleBlockerAddWebsite(req, res);
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/websites/remove") {
-      return await handleBlockerRemoveWebsite(req, res);
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/tier2") {
-      return await handleBlockerTier2(req, res);
-    }
-
-    if (req.method === "GET" && url.pathname === "/api/blocker/apps") {
-      return sendJson(res, 200, { apps: getBlockerApps() });
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/apps") {
-      return await handleBlockerAddApp(req, res);
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/apps/remove") {
-      return await handleBlockerRemoveApp(req, res);
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/tier3") {
-      return await handleBlockerTier3(req, res);
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/tier3/unlock") {
-      return await handleBlockerTier3Unlock(req, res);
-    }
-
-    if (req.method === "GET" && url.pathname === "/api/blocker/screentime") {
-      return sendJson(res, 200, getBlockerScreenTime());
-    }
-
     if (req.method === "GET" && url.pathname === "/api/community/posts") {
-      return sendJson(res, 200, getCommunityPosts(url.searchParams.get("filter")));
+      return sendJson(res, 200, community.list(current().user.id, url.searchParams.get("filter")));
     }
 
     if (req.method === "POST" && url.pathname === "/api/community/posts") {
-      return await handleCommunityCreatePost(req, res);
+      return sendJson(res, 200, community.create(current().user.id, await readJson(req)));
     }
 
     if (req.method === "GET" && url.pathname === "/api/community/post") {
-      return sendJson(res, 200, getCommunityPost(url.searchParams.get("id")));
+      return sendJson(res, 200, community.get(url.searchParams.get("id"), current().user.id));
     }
 
     if (req.method === "POST" && url.pathname === "/api/community/comment") {
-      return await handleCommunityComment(req, res);
+      return sendJson(res, 200, community.comment(current().user.id, await readJson(req)));
     }
 
     if (req.method === "POST" && url.pathname === "/api/community/like") {
-      return await handleCommunityLike(req, res);
+      return sendJson(res, 200, community.like(current().user.id, await readJson(req)));
     }
 
     sendJson(res, 404, { error: "Not Found" });
   } catch (error) {
-    sendJson(res, 500, { error: getErrorMessage(error) });
+    throw error;
   }
-});
+}
 
-server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  server.listen(PORT, HOST, () => console.log(`Quittr running on ${HOST}:${PORT}; database: ${path.join(DATA_DIR, "quittr.sqlite")}`));
+  for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => {
+    server.close(() => { store.close(); process.exit(0); });
+    const timer = setTimeout(() => process.exit(1), 30000); timer.unref();
+  });
+}
+module.exports = { server, store };
 
-async function requestMeliusCompletion(payload) {
+async function requestMeliusCompletion(payload, { model = MELIUS_MODEL_NAME, timeoutMs = 25000, onDelta } = {}) {
   const apiKey = String(process.env.DASHSCOPE_API_KEY || "").trim();
   if (!apiKey) throw new Error("Missing DASHSCOPE_API_KEY in .env.");
   const response = await fetch(`${API_BASE_URL}/chat/completions`, {
     method: "POST",
-    signal: AbortSignal.timeout(25000),
+    signal: AbortSignal.timeout(timeoutMs),
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: MELIUS_MODEL_NAME, enable_thinking: false, ...payload })
+    body: JSON.stringify({ model, enable_thinking: false, ...payload })
   });
+  if (response.ok && payload.stream) return readCompletionStream(response.body, onDelta);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const detail = data.error?.message || data.message || data.code || response.statusText;
@@ -211,6 +327,22 @@ async function handleMeliusChat(req, res) {
     .map((message) => ({ role: message.role, content: String(message.text || message.content || "").slice(0, 3000) }))
     .filter((message) => message.content.trim()).slice(-12);
   const requestId = typeof body.requestId === "string" ? body.requestId : crypto.randomUUID();
+  if (body.stream === true) {
+    setCorsHeaders(res);
+    res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "Connection": "keep-alive", "X-Accel-Buffering": "no" });
+    res.flushHeaders();
+    const emit = (event, data) => { if (!res.destroyed && !res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+    const heartbeat = setInterval(() => { if (!res.destroyed && !res.writableEnded) res.write(": keepalive\n\n"); }, 12000);
+    res.once("close", () => clearInterval(heartbeat));
+    try {
+      const result = await melius.send({ requestId, messages, onEvent: ({ type, ...data }) => emit(type, data) });
+      emit("done", { ...result, model: MELIUS_MODEL_NAME });
+    } catch (error) {
+      const timedOut = ["TimeoutError", "AbortError"].includes(error.name);
+      emit("error", { error: timedOut ? "回复等待超时，请重新发送。已完成的记录不会重复保存。" : error.message, requestId, actions: melius.savedActions(requestId) });
+    } finally { clearInterval(heartbeat); if (!res.destroyed) res.end(); }
+    return;
+  }
   try {
     const result = await melius.send({ requestId, messages });
     sendJson(res, 200, { ...result, model: MELIUS_MODEL_NAME });
@@ -384,36 +516,30 @@ function buildQuittrAnalytics(now = new Date()) {
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function readQuittrState() {
-  if (!fs.existsSync(QUITTR_STATE_PATH)) {
-    const seeded = createDefaultQuittrState();
-    writeQuittrState(seeded);
-    return seeded;
-  }
+  if (!current()) throw failure(401, "请先登录。");
+  return structuredClone(current().state);
+}
 
-  const state = readJsonFile(QUITTR_STATE_PATH);
-  if (!state.startedAt) {
-    const seeded = createDefaultQuittrState();
-    writeQuittrState(seeded);
-    return seeded;
-  }
-
-  return state;
+// Keep the previous product's records intact, without feeding them into the
+// sugar companion, lessons or timeline. Tables and account IDs stay unchanged.
+function readSugarState() {
+  const state = readQuittrState();
+  if (!state.sugar) { state.sugar = initialSugar(); writeQuittrState(state); }
+  const turns = Object.entries(state.meliusTurns || {}).filter(([id]) => id.startsWith('sugar_')).map(([id, turn]) => [id.slice(6), turn]);
+  return { ...initialSugar(), ...state.sugar, journalEntries: (state.journalEntries || []).filter(entry => entry.product === 'sugar'), meliusTurns: Object.fromEntries(turns) };
+}
+function writeSugarState(next) {
+  const state = readQuittrState();
+  const { journalEntries = [], meliusTurns = {}, ...sugar } = next;
+  const turns = Object.fromEntries(Object.entries(meliusTurns).map(([id, turn]) => [`sugar_${id}`, { ...turn, product: 'sugar' }]));
+  writeQuittrState({ ...state, sugar, journalEntries: [...(state.journalEntries || []).filter(entry => entry.product !== 'sugar'), ...journalEntries.map(entry => ({ ...entry, product: 'sugar' }))], meliusTurns: { ...state.meliusTurns, ...turns } });
 }
 
 function writeQuittrState(state) {
-  writeJsonFile(QUITTR_STATE_PATH, {
-    ...state,
-    updatedAt: state.updatedAt || new Date().toISOString()
-  });
-}
-
-function createDefaultQuittrState(now = new Date()) {
-  const day = DAY_MS;
-  return {
-    startedAt: new Date(now.getTime() - 34 * day).toISOString(),
-    relapses: [31, 30, 27, 19, 12, 7].map((daysAgo) => new Date(now.getTime() - daysAgo * day).toISOString()),
-    updatedAt: now.toISOString()
-  };
+  const context = current();
+  if (!context) throw failure(401, "请先登录。");
+  store.write(context.user.id, state);
+  context.state = structuredClone(state);
 }
 
 function normalizeRelapses(relapses, startedAt, now) {
@@ -601,29 +727,6 @@ function extractTextFromDashScope(data) {
   return candidates.map((item) => item.trim()).find(Boolean) || "";
 }
 
-function readJsonFile(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch {
-    return {};
-  }
-}
-
-function writeJsonFile(filePath, payload) {
-  writeTextFileAtomic(filePath, `${JSON.stringify(payload, null, 2)}\n`);
-}
-
-function writeTextFileAtomic(filePath, text) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
-  fs.writeFileSync(tmpPath, text, "utf8");
-  fs.renameSync(tmpPath, filePath);
-}
-
 function sendJson(res, statusCode, payload) {
   setCorsHeaders(res);
   res.writeHead(statusCode, {
@@ -635,27 +738,32 @@ function sendJson(res, statusCode, payload) {
 function serveFile(res, filePath, contentType) {
   const content = fs.readFileSync(filePath);
   setCorsHeaders(res);
-  res.writeHead(200, { "Content-Type": contentType });
+  res.writeHead(200, { "Content-Type": contentType, "Cache-Control": "no-store" });
   res.end(content);
 }
 
 function setCorsHeaders(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Vary", "Origin");
 }
 
 function readJson(req) {
+  if (req.jsonBody !== undefined) return Promise.resolve(req.jsonBody);
   return new Promise((resolve, reject) => {
-    let raw = "";
+    const chunks = [];
+    let bytes = 0;
     req.on("data", (chunk) => {
-      raw += chunk.toString();
+      bytes += chunk.length;
+      if (bytes > 128 * 1024) { reject(failure(413, "请求内容过大。")); return; }
+      chunks.push(chunk);
     });
     req.on("end", () => {
       try {
-        resolve(raw ? JSON.parse(raw) : {});
+        const raw = Buffer.concat(chunks).toString("utf8");
+        const body = raw ? JSON.parse(raw) : {};
+        if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Invalid object");
+        resolve(body);
       } catch (error) {
-        reject(new Error("Invalid JSON request body."));
+        reject(failure(400, "请求 JSON 格式无效。"));
       }
     });
     req.on("error", reject);
@@ -689,475 +797,4 @@ function loadEnvFile(filePath) {
 
 function getErrorMessage(error) {
   return error instanceof Error ? error.message : String(error);
-}
-
-const DEFAULT_ADULT_DOMAINS = [
-  "pornhub.com", "xvideos.com", "xnxx.com", "xhamster.com", "redtube.com",
-  "youporn.com", "tube8.com", "spankbang.com", "brazzers.com", "onlyfans.com",
-  "chaturbate.com", "stripchat.com", "cam4.com", "livejasmin.com", "bongacams.com",
-  "eporner.com", "tnaflix.com", "beeg.com", "daftsex.com", "xmoviesforyou.com"
-];
-
-const AVAILABLE_APPS = [
-  { id: "safari", name: "Safari", category: "Browser" },
-  { id: "chrome", name: "Chrome", category: "Browser" },
-  { id: "youtube", name: "YouTube", category: "Entertainment" },
-  { id: "instagram", name: "Instagram", category: "Social" },
-  { id: "tiktok", name: "TikTok", category: "Social" },
-  { id: "x", name: "X (Twitter)", category: "Social" },
-  { id: "reddit", name: "Reddit", category: "Social" },
-  { id: "snapchat", name: "Snapchat", category: "Social" },
-  { id: "facebook", name: "Facebook", category: "Social" },
-  { id: "twitch", name: "Twitch", category: "Entertainment" },
-  { id: "netflix", name: "Netflix", category: "Entertainment" },
-  { id: "discord", name: "Discord", category: "Communication" },
-  { id: "telegram", name: "Telegram", category: "Communication" },
-  { id: "whatsapp", name: "WhatsApp", category: "Communication" }
-];
-
-function createDefaultBlockerState(now = new Date()) {
-  return {
-    protectionEnabled: false,
-    tier1: {
-      enabled: false,
-      presetDomains: DEFAULT_ADULT_DOMAINS.slice(),
-      customWebsites: []
-    },
-    tier2: {
-      enabled: false,
-      screenTimeIntegration: false,
-      apps: []
-    },
-    tier3: {
-      enabled: false,
-      lockedAt: null,
-      passcodeHash: null
-    },
-    screenTime: {
-      todayMinutes: 0,
-      pickups: 0,
-      updatedAt: now.toISOString()
-    },
-    updatedAt: now.toISOString()
-  };
-}
-
-function getBlockerState() {
-  const state = readQuittrState();
-  if (!state.blocker || !state.blocker.tier1) {
-    const blocker = createDefaultBlockerState();
-    writeQuittrState({ ...state, blocker, updatedAt: new Date().toISOString() });
-    return blocker;
-  }
-  return state.blocker;
-}
-
-function writeBlockerState(blocker) {
-  const state = readQuittrState();
-  const updatedAt = new Date().toISOString();
-  blocker.updatedAt = updatedAt;
-  writeQuittrState({ ...state, blocker, updatedAt });
-  return blocker;
-}
-
-function getBlockerWebsites() {
-  const blocker = getBlockerState();
-  const preset = (blocker.tier1.presetDomains || []).map((domain) => ({ domain, preset: true }));
-  const custom = (blocker.tier1.customWebsites || []).map((domain) => ({ domain, preset: false }));
-  return [...preset, ...custom];
-}
-
-function getBlockerApps() {
-  const blocker = getBlockerState();
-  return blocker.tier2.apps || [];
-}
-
-function getBlockerScreenTime() {
-  const blocker = getBlockerState();
-  return blocker.screenTime || { todayMinutes: 0, pickups: 0 };
-}
-
-function normalizeDomain(input) {
-  return String(input || "")
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, "")
-    .replace(/^www\./, "")
-    .replace(/\/.+$/, "");
-}
-
-function hashPasscode(passcode) {
-  return crypto.createHash("sha256").update(String(passcode || "")).digest("hex");
-}
-
-async function handleBlockerProtection(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const blocker = getBlockerState();
-  const enabled = Boolean(body.enabled);
-  blocker.protectionEnabled = enabled;
-  if (enabled && !blocker.tier1.enabled) {
-    blocker.tier1.enabled = true;
-  }
-  if (!enabled) {
-    if (blocker.tier3.enabled) {
-      return sendJson(res, 403, { error: "Permanent lock is active. Protection cannot be turned off." });
-    }
-    blocker.tier1.enabled = false;
-    blocker.tier2.enabled = false;
-  }
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, updated);
-}
-
-async function handleBlockerTier1(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const blocker = getBlockerState();
-  blocker.tier1.enabled = Boolean(body.enabled);
-  if (blocker.tier1.enabled) {
-    blocker.protectionEnabled = true;
-  } else if (!blocker.tier2.enabled) {
-    blocker.protectionEnabled = false;
-  }
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, updated);
-}
-
-async function handleBlockerAddWebsite(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const domain = normalizeDomain(body.website || body.domain);
-  if (!domain || !domain.includes(".")) {
-    return sendJson(res, 400, { error: "Please enter a valid website domain." });
-  }
-  const blocker = getBlockerState();
-  const presetDomains = blocker.tier1.presetDomains || [];
-  const customWebsites = blocker.tier1.customWebsites || [];
-  if (presetDomains.includes(domain) || customWebsites.includes(domain)) {
-    return sendJson(res, 409, { error: "This website is already blocked." });
-  }
-  customWebsites.push(domain);
-  blocker.tier1.customWebsites = customWebsites;
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, { websites: getBlockerWebsites(), blocker: updated });
-}
-
-async function handleBlockerRemoveWebsite(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const domain = normalizeDomain(body.website || body.domain);
-  const blocker = getBlockerState();
-  blocker.tier1.customWebsites = (blocker.tier1.customWebsites || []).filter((item) => item !== domain);
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, { websites: getBlockerWebsites(), blocker: updated });
-}
-
-async function handleBlockerTier2(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const blocker = getBlockerState();
-  blocker.tier2.enabled = Boolean(body.enabled);
-  if (blocker.tier2.enabled) {
-    blocker.tier2.screenTimeIntegration = true;
-    if (!blocker.tier1.enabled) {
-      blocker.tier1.enabled = true;
-      blocker.protectionEnabled = true;
-    }
-  }
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, updated);
-}
-
-async function handleBlockerAddApp(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const appId = String(body.appId || body.id || "").trim();
-  const appDef = AVAILABLE_APPS.find((app) => app.id === appId);
-  if (!appDef) {
-    return sendJson(res, 400, { error: "Unknown app." });
-  }
-  const blocker = getBlockerState();
-  const apps = blocker.tier2.apps || [];
-  if (apps.some((app) => app.id === appId)) {
-    return sendJson(res, 409, { error: "This app is already blocked." });
-  }
-  apps.push({ id: appDef.id, name: appDef.name, category: appDef.category, blockedAt: new Date().toISOString() });
-  blocker.tier2.apps = apps;
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, { apps: getBlockerApps(), blocker: updated });
-}
-
-async function handleBlockerRemoveApp(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const appId = String(body.appId || body.id || "").trim();
-  const blocker = getBlockerState();
-  if (blocker.tier3.enabled) {
-    return sendJson(res, 403, { error: "Permanent lock is active. Apps cannot be removed." });
-  }
-  blocker.tier2.apps = (blocker.tier2.apps || []).filter((app) => app.id !== appId);
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, { apps: getBlockerApps(), blocker: updated });
-}
-
-async function handleBlockerTier3(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const passcode = String(body.passcode || "").trim();
-  if (passcode.length < 4) {
-    return sendJson(res, 400, { error: "Passcode must be at least 4 digits." });
-  }
-  const blocker = getBlockerState();
-  if ((blocker.tier2.apps || []).length === 0) {
-    return sendJson(res, 400, { error: "Add at least one app to block before enabling permanent lock." });
-  }
-  blocker.tier3.enabled = true;
-  blocker.tier3.lockedAt = new Date().toISOString();
-  blocker.tier3.passcodeHash = hashPasscode(passcode);
-  blocker.tier2.enabled = true;
-  blocker.tier1.enabled = true;
-  blocker.protectionEnabled = true;
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, updated);
-}
-
-async function handleBlockerTier3Unlock(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const passcode = String(body.passcode || "").trim();
-  const blocker = getBlockerState();
-  if (!blocker.tier3.enabled) {
-    return sendJson(res, 400, { error: "Permanent lock is not active." });
-  }
-  if (hashPasscode(passcode) !== blocker.tier3.passcodeHash) {
-    return sendJson(res, 403, { error: "Incorrect passcode. The permanent lock remains in place." });
-  }
-  blocker.tier3.enabled = false;
-  blocker.tier3.lockedAt = null;
-  blocker.tier3.passcodeHash = null;
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, updated);
-}
-
-const COMMUNITY_AVATARS = ["🐶", "🐱", "🦊", "🐻", "🐼", "🦁", "🐯", "🐨", "🐸", "🐵", "🦉", "hawk"];
-
-function createDefaultCommunityState(now = new Date()) {
-  const weekAgo = new Date(now.getTime() - 28 * DAY_MS);
-  const posts = [
-    {
-      id: crypto.randomUUID(),
-      author: "Constant Lie",
-      authorAvatar: "🦊",
-      streak: 0,
-      title: "Constant Lie",
-      body: "I do good for a week or so and then lie to myself that one time won't hurt. But it always does. How do you stop the self-deception?",
-      createdAt: new Date(now.getTime() - 28 * DAY_MS).toISOString(),
-      comments: [],
-      likes: 2,
-      likedByMe: false,
-      views: 44
-    },
-    {
-      id: crypto.randomUUID(),
-      author: "Nathan",
-      authorAvatar: "🐶",
-      streak: 14,
-      title: "Peace",
-      body: "Guys... I am so stoked right now. Two weeks clean and I finally feel like myself again. The fog is lifting. If you're struggling right now, keep going. It gets better.",
-      createdAt: new Date(now.getTime() - 21 * DAY_MS).toISOString(),
-      comments: [
-        { id: crypto.randomUUID(), author: "Ian Rent", authorAvatar: "🐻", text: "This is inspiring man, keep it up!", createdAt: new Date(now.getTime() - 20 * DAY_MS).toISOString() }
-      ],
-      likes: 9,
-      likedByMe: false,
-      views: 47
-    },
-    {
-      id: crypto.randomUUID(),
-      author: "Ian Rent",
-      authorAvatar: "🐻",
-      streak: 0,
-      title: "I keep doing it",
-      body: "I've been doing it at least once a day and it's pissing me off but it's a habit now. How do I stop?",
-      createdAt: new Date(now.getTime() - 14 * DAY_MS).toISOString(),
-      comments: [],
-      likes: 0,
-      likedByMe: false,
-      views: 52
-    },
-    {
-      id: crypto.randomUUID(),
-      author: "Rigoberto Reyes",
-      authorAvatar: "🦁",
-      streak: 3,
-      title: "I'm struggling",
-      body: "I'm having a very hard time with this. Every night it's the same battle. Any tips for getting through the late night urges?",
-      createdAt: new Date(now.getTime() - 10 * DAY_MS).toISOString(),
-      comments: [
-        { id: crypto.randomUUID(), author: "Kempa", authorAvatar: "🐼", text: "Cold showers at night helped me a lot. Stay strong brother.", createdAt: new Date(now.getTime() - 9 * DAY_MS).toISOString() }
-      ],
-      likes: 1,
-      likedByMe: false,
-      views: 60
-    },
-    {
-      id: crypto.randomUUID(),
-      author: "Kempa",
-      authorAvatar: "🐼",
-      streak: 0,
-      title: "Need a sex therapist hotline",
-      body: "I can't stop guys I need help. Does anyone know a hotline or resource I can call? I feel like I can't do this alone anymore.",
-      createdAt: new Date(now.getTime() - 7 * DAY_MS).toISOString(),
-      comments: [],
-      likes: 0,
-      likedByMe: false,
-      views: 55
-    },
-    {
-      id: crypto.randomUUID(),
-      author: "Zeke",
-      authorAvatar: "🐯",
-      streak: 15,
-      title: "Day 15",
-      body: "No porn, but I can't stop jerking off. How do I stop? The porn is gone but the habit is still there. Any advice?",
-      createdAt: new Date(now.getTime() - 3 * DAY_MS).toISOString(),
-      comments: [],
-      likes: 0,
-      likedByMe: false,
-      views: 86
-    },
-    {
-      id: crypto.randomUUID(),
-      author: "Anonymous",
-      authorAvatar: "🦉",
-      streak: 7,
-      title: "Don't go on Reddit or X",
-      body: "Seriously, those platforms are full of triggers. Deleted both apps and my urges dropped significantly. Highly recommend.",
-      createdAt: new Date(now.getTime() - 1 * DAY_MS).toISOString(),
-      comments: [],
-      likes: 5,
-      likedByMe: false,
-      views: 32
-    }
-  ];
-  return { posts, updatedAt: now.toISOString() };
-}
-
-function getCommunityState() {
-  const state = readQuittrState();
-  if (!state.community || !Array.isArray(state.community.posts)) {
-    const community = createDefaultCommunityState();
-    writeQuittrState({ ...state, community, updatedAt: new Date().toISOString() });
-    return community;
-  }
-  return state.community;
-}
-
-function writeCommunityState(community) {
-  const state = readQuittrState();
-  const updatedAt = new Date().toISOString();
-  community.updatedAt = updatedAt;
-  writeQuittrState({ ...state, community, updatedAt });
-  return community;
-}
-
-function formatTimeAgo(date) {
-  const diff = Date.now() - new Date(date).getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-  const weeks = Math.floor(diff / 604800000);
-  if (weeks >= 1) return `${weeks}w ago`;
-  if (days >= 1) return `${days}d ago`;
-  if (hours >= 1) return `${hours}h ago`;
-  if (minutes >= 1) return `${minutes}m ago`;
-  return "just now";
-}
-
-function formatPost(post) {
-  return {
-    ...post,
-    timeAgo: formatTimeAgo(post.createdAt),
-    commentCount: (post.comments || []).length
-  };
-}
-
-function getCommunityPosts(filter) {
-  const community = getCommunityState();
-  let posts = (community.posts || []).slice();
-  if (filter === "top") {
-    posts.sort((a, b) => (b.likes || 0) - (a.likes || 0));
-  } else {
-    posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }
-  return { posts: posts.map(formatPost) };
-}
-
-function getCommunityPost(id) {
-  const community = getCommunityState();
-  const post = (community.posts || []).find((p) => p.id === id);
-  if (!post) {
-    return { error: "Post not found" };
-  }
-  post.views = (post.views || 0) + 1;
-  writeCommunityState(community);
-  return { post: formatPost(post) };
-}
-
-async function handleCommunityCreatePost(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const title = String(body.title || "").trim();
-  const postBody = String(body.body || "").trim();
-  if (!title && !postBody) {
-    return sendJson(res, 400, { error: "Post cannot be empty." });
-  }
-  const community = getCommunityState();
-  const avatar = COMMUNITY_AVATARS[Math.floor(Math.random() * COMMUNITY_AVATARS.length)];
-  const post = {
-    id: crypto.randomUUID(),
-    author: "You",
-    authorAvatar: avatar,
-    streak: 0,
-    title: title || "Untitled",
-    body: postBody,
-    createdAt: new Date().toISOString(),
-    comments: [],
-    likes: 0,
-    likedByMe: false,
-    views: 0
-  };
-  community.posts = [post, ...(community.posts || [])];
-  writeCommunityState(community);
-  sendJson(res, 200, { post: formatPost(post) });
-}
-
-async function handleCommunityComment(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const postId = String(body.postId || "").trim();
-  const text = String(body.text || "").trim();
-  if (!text) {
-    return sendJson(res, 400, { error: "Comment cannot be empty." });
-  }
-  const community = getCommunityState();
-  const post = (community.posts || []).find((p) => p.id === postId);
-  if (!post) {
-    return sendJson(res, 404, { error: "Post not found." });
-  }
-  const avatar = COMMUNITY_AVATARS[Math.floor(Math.random() * COMMUNITY_AVATARS.length)];
-  const comment = {
-    id: crypto.randomUUID(),
-    author: "You",
-    authorAvatar: avatar,
-    text,
-    createdAt: new Date().toISOString()
-  };
-  post.comments = [comment, ...(post.comments || [])];
-  writeCommunityState(community);
-  sendJson(res, 200, { post: formatPost(post), comment });
-}
-
-async function handleCommunityLike(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const postId = String(body.postId || "").trim();
-  const community = getCommunityState();
-  const post = (community.posts || []).find((p) => p.id === postId);
-  if (!post) {
-    return sendJson(res, 404, { error: "Post not found." });
-  }
-  post.likedByMe = !post.likedByMe;
-  post.likes = Math.max(0, (post.likes || 0) + (post.likedByMe ? 1 : -1));
-  writeCommunityState(community);
-  sendJson(res, 200, { post: formatPost(post) });
 }

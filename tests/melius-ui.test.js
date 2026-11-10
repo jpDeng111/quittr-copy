@@ -125,3 +125,79 @@ test("assistant emphasis is rendered safely without literal markers or HTML exec
   assert.equal(parts[1].children[0], "吸气");
   assert.equal(parts[2], " <script>alert(1)</script>");
 });
+
+test('partial streaming text updates a single bubble before completion and finalizes without duplication', async () => {
+  let deliver, finish;
+  const harness = uiHarness({ sendMeliusMessage: async (_, __, ___, onEvent) => {
+    deliver = onEvent;
+    return new Promise((resolve) => { finish = resolve; });
+  } });
+  let chat = harness.render('useMeliusConversation(async () => {})');
+  const pending = chat.send('你好');
+  deliver({ type: 'delta', text: '我在' });
+  chat = harness.render('useMeliusConversation(async () => {})');
+  assert.equal(chat.messages[1].text, '我在');
+  assert.equal(chat.messages[1].status, 'streaming');
+  assert.equal(chat.isSending, true);
+  deliver({ type: 'delta', text: '这里。' });
+  finish({ reply: '我在这里。', actions: [] });
+  await pending;
+  chat = harness.render('useMeliusConversation(async () => {})');
+  assert.equal(chat.messages.length, 2);
+  assert.equal(chat.messages[1].text, '我在这里。');
+  assert.equal(chat.messages[1].status, 'complete');
+  assert.equal(chat.messages[0].status, 'answered');
+});
+
+test('an interrupted stream preserves partial text but excludes it from later conversation context', async () => {
+  let calls = 0, nextContext;
+  const harness = uiHarness({ sendMeliusMessage: async (context, _, __, onEvent) => {
+    if (++calls === 1) { onEvent({ type: 'delta', text: '这段还没说完' }); throw new Error('网络中断'); }
+    nextContext = context; return { reply: '完整回复', actions: [] };
+  } });
+  let chat = harness.render('useMeliusConversation(async () => {})');
+  await chat.send('第一句');
+  chat = harness.render('useMeliusConversation(async () => {})');
+  assert.equal(chat.messages[1].status, 'interrupted');
+  assert.equal(chat.messages[1].text, '这段还没说完');
+  await chat.send('第二句');
+  assert.equal(nextContext.length, 1);
+  assert.equal(nextContext[0].text, '第二句');
+});
+
+test('a streamed card appears immediately and survives the next text-round reset', async () => {
+  let deliver, finish;
+  const harness = uiHarness({ sendMeliusMessage: async (_, __, ___, onEvent) => { deliver = onEvent; return new Promise((resolve) => { finish = resolve; }); } });
+  let chat = harness.render('useMeliusConversation(async () => {})');
+  const pending = chat.send('给我一张行动卡');
+  const card = { id: 'card-001', type: 'content_card', title: '今天的一小步' };
+  deliver({ type: 'card', card });
+  deliver({ type: 'reset' });
+  chat = harness.render('useMeliusConversation(async () => {})');
+  assert.equal(chat.messages[1].actions[0].id, card.id);
+  assert.equal(chat.isSending, true);
+  deliver({ type: 'delta', text: '先挑一件试试。' });
+  finish({ reply: '先挑一件试试。', actions: [card] });
+  await pending;
+  chat = harness.render('useMeliusConversation(async () => {})');
+  assert.equal(chat.messages.length, 2);
+  assert.equal(chat.messages[1].actions.length, 1);
+});
+
+test('artifact steps select locally, discussion prefills a prompt, and copying uses actual card content', async () => {
+  let copied, discussed;
+  const harness = uiHarness();
+  harness.ctx.navigator = { clipboard: { writeText: async (text) => { copied = text; } } };
+  harness.ctx.artifactProps = { card: { id: 'card-1', kind: 'plan', title: '今天的小计划', body: '只做一件小事。', items: [{ title: '休息', body: '起身喝水。' }, { title: '收尾', body: '写下下一步。' }], takeaway: '一点点也很好。' }, onDiscuss: (card) => { discussed = card.title; } };
+  let tree = harness.render('MeliusArtifactCard(artifactProps)');
+  find(tree, (node) => node.props.className === 'artifact-item').props.onClick();
+  tree = harness.render('MeliusArtifactCard(artifactProps)');
+  assert.equal(find(tree, (node) => node.props.className === 'artifact-item is-chosen').props['aria-pressed'], true);
+  find(tree, (node) => node.props['aria-label'] === '继续聊「今天的小计划」').props.onClick();
+  assert.equal(discussed, '今天的小计划');
+  await find(tree, (node) => node.props['aria-label'] === '复制卡片').props.onClick();
+  assert.match(copied, /今天的小计划/);
+  assert.match(copied, /1. 休息：起身喝水。/);
+  tree = harness.render('MeliusArtifactCard(artifactProps)');
+  assert.equal(find(tree, (node) => node.props['aria-label'] === '复制卡片').children[0], '已复制');
+});

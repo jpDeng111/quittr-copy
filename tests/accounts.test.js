@@ -1,0 +1,186 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { createStore, current, chatHistory } = require('../storage');
+const { createAuth, hashPassword } = require('../auth');
+const { DatabaseSync } = require('node:sqlite');
+const { execFile } = require('node:child_process');
+const execute = require('node:util').promisify(execFile);
+
+test('account requests serialize across async work without blocking another account', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'quittr-lock-'));
+  const store = createStore(path.join(dir, 'test.sqlite'));
+  for (const id of ['a', 'b']) store.db.prepare('INSERT INTO users(id,email,password_hash,created_at) VALUES(?,?,?,?)').run(id, id, 'unused', new Date().toISOString());
+  let release, started;
+  const gate = new Promise(resolve => { release = resolve; });
+  const ready = new Promise(resolve => { started = resolve; });
+  const first = store.run({ id: 'a' }, async () => {
+    started(); await gate;
+    store.write('a', { ...current().state, reasons: ['one'] });
+  });
+  await ready;
+  const second = store.run({ id: 'a' }, () => {
+    assert.deepEqual(current().state.reasons, ['one']);
+    store.write('a', { ...current().state, reasons: ['one', 'two'] });
+  });
+  await store.run({ id: 'b' }, () => assert.equal(current().state.reasons, undefined));
+  release(); await Promise.all([first, second]);
+  assert.deepEqual(store.read('a').reasons, ['one', 'two']);
+  store.close(); fs.rmSync(dir, { recursive: true });
+});
+
+test('history pagination is stable with identical timestamps and failed turns keep retry context', () => {
+  const state = { meliusTurns: Object.fromEntries(['a', 'b', 'c'].map(id => [id, { userText: id, createdAt: '2026-11-09', context: [{ role: 'user', text: id }] }])) };
+  const page = chatHistory(state, { limit: 2 });
+  assert.deepEqual(page.messages.map(message => message.id), ['b', 'c']);
+  assert.equal(page.nextCursor, 'b');
+  assert.deepEqual(chatHistory(state, { before: page.nextCursor }).messages.map(message => message.id), ['a']);
+  assert.equal(page.messages[0].status, 'failed');
+  assert.throws(() => chatHistory(state, { before: 'missing' }), /游标/);
+});
+
+test('registration can be closed and login attempts are limited in durable storage', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'quittr-auth-'));
+  const store = createStore(path.join(dir, 'test.sqlite'));
+  const auth = createAuth(store, { allowRegistration: false, secure: true });
+  const req = { headers: {}, socket: { remoteAddress: 'test' } };
+  const res = { setHeader() {} };
+  await assert.rejects(auth.handle('register', req, res, { email: 'a@example.com', password: 'a-long-password' }), { status: 403 });
+  for (let index = 0; index < 12; index++) await assert.rejects(auth.handle('login', req, res, { email: 'missing@example.com', password: 'wrong' }), { status: 401 });
+  await assert.rejects(auth.handle('login', req, res, { email: 'missing@example.com', password: 'wrong' }), { status: 429 });
+  assert.ok(store.db.prepare('SELECT count(*) AS n FROM auth_attempts').get().n > 0);
+  auth.limitUser('account', 'chat', 1, 1);
+  assert.throws(() => auth.limitUser('account', 'chat', 1, 1), { status: 429 });
+  const one = await hashPassword('same-password'), two = await hashPassword('same-password');
+  assert.notEqual(one, two);
+  store.close(); fs.rmSync(dir, { recursive: true });
+});
+
+test('HTTP registration, account isolation, chat history, restart and session revocation', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'quittr-http-'));
+  process.env.QUITTR_DATA_DIR = dir;
+  process.env.PUBLIC_ORIGIN = '';
+  process.env.ALLOW_REGISTRATION = 'true';
+  let app, base;
+  async function start() {
+    delete require.cache[require.resolve('../server')];
+    app = require('../server');
+    await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
+    base = `http://127.0.0.1:${app.server.address().port}`;
+  }
+  async function stop() { await new Promise(resolve => app.server.close(resolve)); app.store.close(); }
+  async function request(route, { body, cookie, headers, raw } = {}) {
+    const response = await fetch(base + route, { method: body === undefined && raw === undefined ? 'GET' : 'POST', headers: {
+      ...(cookie ? { Cookie: cookie } : {}), ...(body !== undefined || raw !== undefined ? { Origin: base, 'Content-Type': 'application/json' } : {}), ...headers
+    }, ...(body !== undefined || raw !== undefined ? { body: raw ?? JSON.stringify(body) } : {}) });
+    const text = await response.text();
+    return { status: response.status, data: text.startsWith('{') ? JSON.parse(text) : text, cookie: response.headers.get('set-cookie')?.split(';')[0], response };
+  }
+  await start();
+  t.after(async () => { await stop(); fs.rmSync(dir, { recursive: true }); });
+  for (const route of ['/mobile.css', '/mobile.js', '/manifest.webmanifest', '/sw.js', '/offline.html', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png']) assert.equal((await request(route)).status, 200);
+  assert.equal((await request('/manifest.webmanifest')).data.display, 'standalone');
+  for (const route of ['/api/quittr/journal', '/api/melius/history', '/api/quittr/analytics', '/api/account/export', '/api/blocker/state', '/api/community/posts', '/api/lessons/daily']) assert.equal((await request(route)).status, 401);
+  assert.equal((await request('/api/auth/register', { body: {}, headers: { Origin: 'https://evil.example' } })).status, 403);
+  assert.equal((await request('/api/auth/register', { raw: '{bad' })).status, 400);
+  assert.equal((await request('/api/auth/register', { raw: JSON.stringify({ value: 'a'.repeat(150000) }) })).status, 413);
+  const password = 'test-password-12345';
+  const a = await request('/api/auth/register', { body: { email: 'A@Example.com', password } });
+  const b = await request('/api/auth/register', { body: { email: 'b@example.com', password } });
+  assert.equal(a.status, 200); assert.equal(b.status, 200);
+  assert.equal(a.data.user.email, 'a@example.com');
+  assert.match(a.response.headers.get('set-cookie'), /HttpOnly; SameSite=Lax/);
+  assert.notEqual(a.cookie, b.cookie);
+  assert.ok(!JSON.stringify(a.data).includes('password_hash'));
+  const rows = app.store.db.prepare('SELECT password_hash FROM users').all();
+  assert.ok(rows.every(row => !row.password_hash.includes(password) && row.password_hash.startsWith('scrypt:')));
+  assert.notEqual(rows[0].password_hash, rows[1].password_hash);
+  assert.ok(!app.store.db.prepare('SELECT token_hash FROM sessions LIMIT 1').get().token_hash.includes(a.cookie.split('=')[1]));
+  const empty = await request('/api/quittr/analytics', { cookie: a.cookie });
+  assert.deepEqual(empty.data.relapses, []);
+  assert.equal((await request('/api/community/posts', { cookie: a.cookie })).data.posts.length, 0);
+  await Promise.all(Array.from({ length: 8 }, (_, index) => request('/api/quittr/journal', { cookie: a.cookie, body: { title: `private-${index}`, body: '秘密记录' } })));
+  assert.equal((await request('/api/quittr/journal', { cookie: a.cookie })).data.entries.length, 8);
+  assert.equal((await request('/api/quittr/journal', { cookie: b.cookie })).data.entries.length, 0);
+  const freshSugar = await request('/api/sugar/state', { cookie: a.cookie });
+  assert.equal(freshSugar.data.logs.length, 0);
+  assert.equal((await request('/api/sugar/journal', { cookie: a.cookie })).data.entries.length, 0);
+  const food = { clientId: 'sugar-http-log-001', name: '下午的咖啡', scene: 'afternoon', sugarKind: 'unknown', userId: b.data.user.id };
+  assert.equal((await request('/api/sugar/logs', { cookie: a.cookie, body: { ...food, timeZone: 'Invalid/Timezone' } })).status, 400);
+  assert.equal((await request('/api/sugar/state', { cookie: a.cookie })).data.logs.length, 0);
+  const sugarSaved = await request('/api/sugar/logs', { cookie: a.cookie, body: food });
+  assert.equal(sugarSaved.status, 200);
+  assert.equal((await request('/api/sugar/logs', { cookie: a.cookie, body: food })).data.entry.id, sugarSaved.data.entry.id);
+  assert.equal((await request('/api/sugar/state', { cookie: a.cookie })).data.logs.length, 1);
+  assert.equal((await request('/api/sugar/state', { cookie: b.cookie })).data.logs.length, 0);
+  assert.equal((await request('/api/sugar/logs', { cookie: a.cookie, body: { ...food, name: 'changed' } })).status, 409);
+  const sugarJournal = { clientId: 'sugar-http-journal-001', title: '工作日随记', body: '今天想给自己多一点空间。' };
+  await request('/api/sugar/journal', { cookie: a.cookie, body: sugarJournal });
+  await request('/api/sugar/journal', { cookie: a.cookie, body: sugarJournal });
+  assert.equal((await request('/api/sugar/journal', { cookie: a.cookie })).data.entries.length, 1);
+  assert.equal((await request('/api/sugar/journal', { cookie: b.cookie })).data.entries.length, 0);
+  assert.equal((await request('/api/blocker/state', { cookie: a.cookie })).status, 410);
+  app.store.db.prepare('INSERT INTO community_posts(id,user_id,title,body,created_at) VALUES(?,?,?,?,?)').run('legacy-post', a.data.user.id, 'Legacy', 'Historical content', new Date().toISOString());
+  assert.equal((await request('/api/community/posts', { cookie: a.cookie })).data.posts.length, 0);
+  assert.equal((await request('/api/quittr/journal', { cookie: b.cookie, headers: { 'X-Quittr-Account': a.data.user.id } })).status, 401);
+  const posted = await request('/api/community/posts', { cookie: a.cookie, body: { title: '共同进步', body: '公开测试帖子' } });
+  assert.equal(posted.status, 200);
+  const visible = await request('/api/community/posts', { cookie: b.cookie });
+  assert.equal(visible.data.posts[0].id, posted.data.post.id);
+  assert.ok(!JSON.stringify(visible.data).includes('a@example.com'));
+  await request('/api/community/comment', { cookie: b.cookie, body: { postId: posted.data.post.id, text: '一起加油' } });
+  const liked = await request('/api/community/like', { cookie: b.cookie, body: { postId: posted.data.post.id } });
+  assert.equal(liked.data.post.likes, 1);
+  assert.equal(liked.data.post.likedByMe, true);
+  const ownerView = await request(`/api/community/post?id=${posted.data.post.id}`, { cookie: a.cookie });
+  assert.equal(ownerView.data.post.comments.length, 1);
+  assert.equal(ownerView.data.post.likedByMe, false);
+  const pledge = { timeZone: 'Asia/Shanghai' };
+  await request('/api/quittr/pledges', { cookie: a.cookie, body: pledge });
+  assert.equal((await request('/api/quittr/pledges', { cookie: a.cookie, body: pledge })).data.pledges.length, 1);
+  const chatBody = { requestId: 'shared-request-001', messages: [{ role: 'user', text: '做做深呼吸' }] };
+  const sent = await request('/api/melius/chat', { cookie: a.cookie, body: chatBody });
+  assert.equal(sent.status, 200);
+  assert.equal((await request('/api/melius/history', { cookie: b.cookie })).data.messages.length, 0);
+  const retry = await request('/api/melius/chat', { cookie: a.cookie, body: chatBody });
+  assert.deepEqual(retry.data, sent.data);
+  assert.equal((await request('/api/melius/history', { cookie: a.cookie })).data.messages.length, 2);
+  assert.equal((await request('/api/melius/chat', { cookie: a.cookie, body: { ...chatBody, messages: [{ role: 'user', text: '打开呼吸练习' }] } })).status, 409);
+  assert.equal((await request('/api/melius/chat', { cookie: b.cookie, body: chatBody })).status, 200);
+  const streamed = await request('/api/melius/chat', { cookie: a.cookie, body: { ...chatBody, requestId: 'stream-request-002', stream: true } });
+  assert.match(streamed.data, /event: done/);
+  await request('/api/account/progress', { cookie: a.cookie, body: { kind: 'course', id: 'lesson-1' } });
+  await request('/api/account/progress', { cookie: a.cookie, body: { kind: 'game', id: 'memory', level: 3 } });
+  await request('/api/account/progress', { cookie: a.cookie, body: { kind: 'game', id: 'memory', level: 2 } });
+  assert.equal((await request('/api/account/bootstrap', { cookie: a.cookie })).data.preferences.gameLevels.memory, 3);
+  assert.deepEqual((await request('/api/account/bootstrap', { cookie: b.cookie })).data.preferences, {});
+  const exported = await request('/api/account/export', { cookie: a.cookie });
+  assert.equal(exported.data.data.journalEntries.length, 9);
+  assert.ok(!JSON.stringify(exported.data).includes('password_hash'));
+  await execute(process.execPath, [path.join(__dirname, '../scripts/admin.js'), 'backup'], { env: { ...process.env, QUITTR_DATA_DIR: dir } });
+  const backupFile = fs.readdirSync(path.join(dir, 'backups'))[0];
+  const snapshot = new DatabaseSync(path.join(dir, 'backups', backupFile), { readOnly: true });
+  assert.equal(snapshot.prepare('SELECT count(*) AS count FROM journal_entries').get().count, 9);
+  assert.equal(snapshot.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');
+  snapshot.close();
+  const beganAt = (await request('/api/quittr/analytics', { cookie: a.cookie })).data.startedAt;
+  await stop(); await start();
+  assert.equal((await request('/api/auth/session', { cookie: a.cookie })).data.user.email, 'a@example.com');
+  assert.equal((await request('/api/quittr/journal', { cookie: a.cookie })).data.entries.length, 9);
+  assert.equal((await request('/api/sugar/state', { cookie: a.cookie })).data.logs.length, 1);
+  assert.equal((await request('/api/sugar/journal', { cookie: a.cookie })).data.entries.length, 1);
+  assert.equal((await request('/api/melius/history', { cookie: a.cookie })).data.messages.length, 4);
+  assert.equal((await request('/api/quittr/analytics', { cookie: a.cookie })).data.startedAt, beganAt);
+  const login = await request('/api/auth/login', { body: { email: 'a@example.com', password } });
+  assert.equal(login.status, 200);
+  const changed = await request('/api/auth/password', { cookie: login.cookie, body: { currentPassword: password, password: 'new-test-password-987' } });
+  assert.equal(changed.status, 200);
+  assert.equal((await request('/api/account/export', { cookie: a.cookie })).status, 401);
+  assert.equal((await request('/api/auth/login', { body: { email: 'a@example.com', password } })).status, 401);
+  assert.equal((await request('/api/account/export', { cookie: changed.cookie })).status, 200);
+  await request('/api/auth/logout', { cookie: changed.cookie, body: {} });
+  assert.equal((await request('/api/account/export', { cookie: changed.cookie })).status, 401);
+  assert.equal((await request('/api/account/export', { cookie: b.cookie })).status, 200);
+});
