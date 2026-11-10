@@ -16,9 +16,10 @@ function createCommunity(db) {
   );
   CREATE INDEX IF NOT EXISTS community_history ON community_posts(created_at DESC);
   CREATE INDEX IF NOT EXISTS community_comments_post ON community_comments(post_id,created_at);`);
+  if (!db.prepare('PRAGMA table_info(community_posts)').all().some(column => column.name === 'product')) db.exec("ALTER TABLE community_posts ADD COLUMN product TEXT NOT NULL DEFAULT 'legacy'");
   const author = id => `用户 ${id.slice(0, 6)}`;
   function post(id, userId) {
-    const row = db.prepare('SELECT * FROM community_posts WHERE id=?').get(id);
+    const row = db.prepare("SELECT * FROM community_posts WHERE id=? AND product='sugar'").get(id);
     if (!row) throw failure(404, '帖子不存在。');
     const comments = db.prepare('SELECT * FROM community_comments WHERE post_id=? ORDER BY created_at').all(id).map(row => ({ id: row.id, author: author(row.user_id), authorAvatar: '🌱', text: row.text, createdAt: row.created_at }));
     return { id: row.id, author: author(row.user_id), authorAvatar: '🌱', title: row.title, body: row.body, createdAt: row.created_at,
@@ -30,14 +31,14 @@ function createCommunity(db) {
   return {
     list(userId, filter) {
       const order = filter === 'top' ? '(SELECT count(*) FROM community_likes l WHERE l.post_id=p.id) DESC, p.created_at DESC' : 'p.created_at DESC';
-      return { posts: db.prepare(`SELECT p.id FROM community_posts p ORDER BY ${order} LIMIT 100`).all().map(row => post(row.id, userId)) };
+      return { posts: db.prepare(`SELECT p.id FROM community_posts p WHERE p.product='sugar' ORDER BY ${order} LIMIT 100`).all().map(row => post(row.id, userId)) };
     },
-    get(id, userId) { db.prepare('UPDATE community_posts SET views=views+1 WHERE id=?').run(id); return { post: post(id, userId) }; },
+    get(id, userId) { db.prepare("UPDATE community_posts SET views=views+1 WHERE id=? AND product='sugar'").run(id); return { post: post(id, userId) }; },
     create(userId, body) {
       const title = text(body.title || '', 200), content = text(body.body || '', 5000);
       if (!title && !content) throw failure(400, '帖子不能为空。');
       const id = crypto.randomUUID();
-      db.prepare('INSERT INTO community_posts(id,user_id,title,body,created_at) VALUES(?,?,?,?,?)').run(id, userId, title || 'Untitled', content, new Date().toISOString());
+      db.prepare("INSERT INTO community_posts(id,user_id,title,body,created_at,product) VALUES(?,?,?,?,?,'sugar')").run(id, userId, title || '工作日的一点分享', content, new Date().toISOString());
       return { post: post(id, userId) };
     },
     comment(userId, body) {

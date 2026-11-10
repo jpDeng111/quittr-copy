@@ -34,7 +34,7 @@ final class QuittrWebModel: NSObject, ObservableObject, WKNavigationDelegate, WK
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.isOpaque = false
-        webView.backgroundColor = UIColor(red: 7/255, green: 8/255, blue: 8/255, alpha: 1)
+        webView.backgroundColor = UIColor(red: 247/255, green: 246/255, blue: 241/255, alpha: 1)
         webView.scrollView.backgroundColor = webView.backgroundColor
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.allowsBackForwardNavigationGestures = true

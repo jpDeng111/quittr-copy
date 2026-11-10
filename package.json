@@ -1,7 +1,7 @@
 {
-  "name": "quittr-dashboard",
+  "name": "qingtian-sugar-companion",
   "version": "1.0.0",
-  "description": "Self-hosted multi-user Quittr with durable journals and Melius conversations",
+  "description": "Light Sweet: a self-hosted workday sugar-reduction companion",
   "engines": { "node": ">=24.13.0 <25" },
   "main": "server.js",
   "scripts": {

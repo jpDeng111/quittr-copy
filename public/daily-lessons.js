@@ -81,7 +81,7 @@ function DailyLessonTeaser({ daily, onAction, compact = false }) {
   return h('button', { className: `daily-teaser${compact ? ' is-compact' : ''}`, type: 'button', onClick: () => onAction('lessons') },
     h('span', { className: 'teaser-art' }, h(LessonArtwork, { theme: lesson.theme, compact: true })),
     h('span', { className: 'teaser-copy' },
-      h('span', { className: 'teaser-eyebrow' }, h(LessonSpark), lesson.completedAt ? '今日已学 · 再看一遍' : 'MELIUS · 今日小课堂', !lesson.completedAt && h('i', { className: 'lesson-new-dot' })),
+      h('span', { className: 'teaser-eyebrow' }, h(LessonSpark), lesson.completedAt ? '今日已学 · 再看一遍' : '小轻 · 今日小课堂', !lesson.completedAt && h('i', { className: 'lesson-new-dot' })),
       h('strong', null, lesson.title.replace(/\n/g, '')), h('small', null, daily.generating ? '正在为你准备专属内容…' : `${lesson.duration} · ${lesson.cards.length} 张卡片 · ${lesson.origin === 'ai' ? (lesson.model ? `${lesson.model} 生成` : 'AI 为你生成') : '精选入门'}`)),
     h('span', { className: 'teaser-arrow' }, h(Icon, { name: 'chevron' })));
 }
@@ -97,7 +97,7 @@ function DailyClassroomPage({ daily, onOpen, onAction, chapters, activeChapterId
     h('header', { className: 'classroom-header' },
       h('button', { className: 'classroom-back', onClick: () => onAction('course back'), 'aria-label': '返回资料库' }, h(Icon, { name: 'chevron-left' })),
       h('div', null, h('span', { className: 'classroom-wordmark' }, 'THE DAILY CLASSROOM'), h('h1', null, '每天，懂自己一点。')),
-      h('span', { className: 'classroom-signature' }, h(LessonSpark), 'with Melius')),
+      h('span', { className: 'classroom-signature' }, h(LessonSpark), 'with 小轻')),
     h('div', { className: 'classroom-tabs', role: 'tablist', 'aria-label': '课程分类' },
       h('button', { role: 'tab', 'aria-selected': tabName === 'today', onClick: () => setTabName('today'), className: tabName === 'today' ? 'is-active' : '' }, '为你推荐', h('span', null, 'FOR YOU')),
       h('button', { role: 'tab', 'aria-selected': tabName === 'courses', onClick: () => setTabName('courses'), className: tabName === 'courses' ? 'is-active' : '' }, '系统课程', h('span', null, 'EXPLORE'))),
@@ -113,10 +113,10 @@ function DailyClassroomPage({ daily, onOpen, onAction, chapters, activeChapterId
           h('div', { className: 'cover-bottom' }, h('div', { className: 'cover-meta' }, h('span', null, h(Icon, { name: 'hourglass' }), lesson.duration), h('span', null, '▤', ` ${lesson.cards.length} 张卡片`)),
             h('button', { className: 'cover-start', type: 'button', onClick: () => onOpen(lesson) }, lesson.completedAt ? '再读一次' : '打开今天的小课堂', h('span', null, '↗')))),
         h('aside', { className: 'classroom-aside' },
-          h('section', { className: 'lesson-context-panel' }, h('div', { className: 'context-heading' }, h('span', { className: 'melius-avatar' }, h(LessonSpark)), h('span', null, h('strong', null, '为什么是这一课'), h('small', null, 'A NOTE FROM MELIUS'))),
+          h('section', { className: 'lesson-context-panel' }, h('div', { className: 'context-heading' }, h('span', { className: 'melius-avatar' }, h(LessonSpark)), h('span', null, h('strong', null, '为什么是这一课'), h('small', null, 'A NOTE FROM LIGHT SWEET'))),
             h('p', { className: 'context-note' }, lesson.reason),
             h('div', { className: 'context-sources' }, lesson.sources.length ? lesson.sources.map((source) => h('span', { key: source }, h(Icon, { name: 'check-circle' }), source)) : h('span', null, h(Icon, { name: 'folder' }), '从一节觉察入门课开始')),
-            h('p', { className: 'context-footnote' }, lesson.hasActivity ? `从${lesson.windowLabel || '昨天'}的记录出发，只关注今天的一小步。` : '今天和 Melius 聊聊，让明天的课程更贴近你。')),
+            h('p', { className: 'context-footnote' }, lesson.hasActivity ? `从${lesson.windowLabel || '昨天'}的记录出发，只关注今天的一小步。` : '今天和 小轻 聊聊，让明天的课程更贴近你。')),
           h('section', { className: 'lesson-roadmap' }, h('h3', null, '小小一课，带走一点改变'),
             ['一个新的理解', '一个随时可做的练习', '一个属于今天的小行动'].map((text, index) => h('div', { key: text }, h('span', null, `0${index + 1}`), h('p', null, text))),
             h('div', { className: 'roadmap-caption' }, '不用一次改变所有。今天，一点就好。')))),
@@ -172,13 +172,13 @@ function DailyLessonReader({ lesson, daily, onBack, onAction, onReplace }) {
     finally { setSaving(false); }
   }
   return h('section', { className: 'daily-reader' },
-    h('header', { className: 'reader-topbar' }, h('button', { className: 'classroom-back', onClick: onBack, 'aria-label': '返回每日小课堂' }, h(Icon, { name: 'chevron-left' })), h('span', null, h(LessonSpark), 'MELIUS 小课堂'), h('span', { className: 'reader-top-meta' }, lesson.duration, ' · ', lesson.origin === 'ai' ? (lesson.model || 'AI 为你生成') : '精选入门'), h('button', { className: 'reader-regenerate', type: 'button', disabled: daily.generating || saving, onClick: regenerate, 'aria-label': '重新生成课程卡片' }, daily.generating ? '正在生成…' : '换一节 ↻')),
+    h('header', { className: 'reader-topbar' }, h('button', { className: 'classroom-back', onClick: onBack, 'aria-label': '返回每日小课堂' }, h(Icon, { name: 'chevron-left' })), h('span', null, h(LessonSpark), '轻甜小课堂'), h('span', { className: 'reader-top-meta' }, lesson.duration, ' · ', lesson.origin === 'ai' ? (lesson.model || 'AI 为你生成') : '精选入门'), h('button', { className: 'reader-regenerate', type: 'button', disabled: daily.generating || saving, onClick: regenerate, 'aria-label': '重新生成课程卡片' }, daily.generating ? '正在生成…' : '换一节 ↻')),
     daily.generating && h('p', { className: 'reader-generation-notice', role: 'status' }, `AI 正在重新编写卡片 · ${daily.generationSeconds || 0}s，当前内容可以继续阅读…`),
     daily.error && h('p', { className: 'reader-save-error', role: 'alert' }, daily.error),
     finished ? h('div', { className: 'reader-completion' }, h('div', { className: 'completion-orbit' }, h(Icon, { name: 'check-circle' })), h('span', { className: 'classroom-wordmark' }, 'A LITTLE WISER, A LITTLE KINDER'), h('h1', null, '今天的你，\n又多懂自己一点。'), h('p', null, '不必急着做到完美。愿这一点理解，陪你走进今天。'),
       h('div', { className: 'completion-takeaway' }, h('span', null, '把这句话带走'), h('blockquote', null, lesson.takeaway), intention && h('div', null, h(Icon, { name: 'check-circle' }), '今天的小行动：', intention)),
       h('button', { className: 'classroom-primary', onClick: onBack }, '收好今天的理解', h('span', null, '↗')),
-      h('button', { className: 'reader-text-button', onClick: () => onAction('melius') }, '和 Melius 聊聊我的感受 →')) :
+      h('button', { className: 'reader-text-button', onClick: () => onAction('melius') }, '和 小轻 聊聊我的感受 →')) :
     h(React.Fragment, null,
       h('div', { className: 'reader-progress', 'aria-label': `阅读进度，第 ${index + 1} 张，共 ${lesson.cards.length} 张` }, lesson.cards.map((item, n) => h('button', { key: n, className: n <= index ? 'is-read' : '', onClick: () => move(n), 'aria-label': `第 ${n + 1} 张：${item.label}`, 'aria-current': n === index ? 'step' : undefined }))),
       h('div', { className: 'reader-layout' },
@@ -201,7 +201,7 @@ function DailyLessonReader({ lesson, daily, onBack, onAction, onReplace }) {
               return h('button', { key: step, 'aria-pressed': selected, className: selected ? 'is-selected' : '', onClick: () => card.kind === 'reflection' ? setReflection(selected ? '' : step) : setIntention(selected ? '' : step) }, h('span', { className: 'choice-circle' }, selected ? '✓' : ''), step);
             }), h('small', null, '选一个贴近你的，也可以直接继续。')) : null,
             h('div', { className: 'learning-highlight' }, h('span', null, '✧'), h('p', null, card.highlight)),
-            h('div', { className: 'learning-card-signature' }, 'QUITTR', h('span', null, 'a little space to grow'))),
+            h('div', { className: 'learning-card-signature' }, '轻甜', h('span', null, 'a little space to grow'))),
           h('div', { className: 'reader-controls' }, h('button', { className: 'reader-previous', disabled: index === 0, onClick: () => move(index - 1) }, '←', h('span', null, '上一张')), h('span', { className: 'reader-counter', 'aria-live': 'polite' }, String(index + 1).padStart(2, '0'), h('i', null, ' / 05')),
             h('button', { className: 'reader-next', disabled: saving, onClick: index === 4 ? finish : () => move(index + 1) }, saving ? '正在保存…' : index === 4 ? '完成今天的小课' : '继续', h('span', null, index === 4 ? '✓' : '→'))),
           saveError && h('p', { className: 'reader-save-error', role: 'alert' }, saveError),

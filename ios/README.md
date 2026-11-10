@@ -1,6 +1,6 @@
-# Quittr iOS
+# 轻甜 iOS
 
-SwiftUI + WKWebView 客户端，连接这台 Mac 已运行的 Quittr 服务，复用相同登录、日记、完整聊天、课程和游戏进度。iOS 16.4+，无第三方 SDK、CocoaPods 或 npm 依赖。
+显示名为轻甜的 SwiftUI + WKWebView 客户端，连接这台 Mac 已运行的 轻甜服务，复用相同登录、饮食小记、渴望、日记、完整聊天与减糖小课。iOS 16.4+，无第三方 SDK、CocoaPods 或 npm 依赖。
 
 ## 安装到 iPhone
 
@@ -38,3 +38,5 @@ xcodebuild -project ios/Quittr.xcodeproj -scheme Quittr -configuration Debug -sd
 仓库提供 `ops/github-actions.yml` 自动测试/模拟器构建模板。当前用于上传的 OAuth 凭据没有 `workflow` scope，GitHub 拒绝直接创建工作流，所以模板尚未启用。具备工作流管理权限后，将其放到 `.github/workflows/ci.yml` 即可触发；在此之前不能把上传代码视为 iOS 编译通过。
 
 安全区实现参考 [WebKit 文档](https://webkit.org/blog/7929/designing-websites-for-iphone-x/)，客户端使用 [WKWebView](https://developer.apple.com/documentation/webkit/wkwebview)。
+
+工程名 `Quittr.xcodeproj`、scheme 与 bundle 标识暂时保留以兼容前一版本；应用显示名、浅色界面、图标和业务页面均已切换为轻甜。新旧记录的隔离策略及原因见根目录 README。

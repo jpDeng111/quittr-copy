@@ -62,7 +62,7 @@ function QuittrRoot() {
     h('div', { className: 'connection-notice', role: 'status' }, '网络已断开，请连接到服务器后再保存记录。'), h(App, { key: account.user.id }));
   if (phase === 'login') return h(AuthScreen, { onAuthenticated: async () => { channelRef.current?.postMessage('changed'); await enter(); }, registrationOpen, notice: error });
   return h('main', { className: 'auth-shell' }, h('section', { className: 'auth-card', role: 'status' },
-    h('span', { className: 'auth-brand' }, 'QUITTR'), h('h1', null, phase === 'error' ? '暂时无法连接' : '正在打开你的空间'),
+    h('span', { className: 'auth-brand' }, '轻甜'), h('h1', null, phase === 'error' ? '暂时无法连接' : '正在打开你的空间'),
     h('p', null, error || '正在恢复账号和记录…'), phase === 'error' && h('button', { className: 'auth-primary', onClick: () => setRetry(value => value + 1) }, '重新连接')));
 }
 
@@ -84,12 +84,12 @@ function AuthScreen({ onAuthenticated, registrationOpen, notice }) {
   }
   function switchMode() { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setPassword(''); setConfirmation(''); }
   return h('main', { className: 'auth-shell' },
-    h('section', { className: 'auth-intro' }, h('span', { className: 'auth-brand' }, '✦ QUITTR'),
-      h('p', { className: 'auth-eyebrow' }, 'ONE DAY AT A TIME'), h('h1', null, '每一次改变，', h('br'), '都值得被记住。'),
-      h('p', null, '记录感受、看见进步，与 Melius 一起走好今天。'),
-      h('div', { className: 'auth-features' }, h('span', null, '日记与成长记录'), h('span', null, '随时接续的对话'), h('span', null, '属于你的个人空间'))),
+    h('section', { className: 'auth-intro' }, h('span', { className: 'auth-brand' }, '◒ 轻甜'),
+      h('p', { className: 'auth-eyebrow' }, 'LESS SUGAR, MORE LIFE'), h('h1', null, '把甜，留给', h('br'), '真正喜欢的时刻。'),
+      h('p', null, '给忙碌的工作日，一点温柔的减糖支持。'),
+      h('div', { className: 'auth-features' }, h('span', null, '工作日饮食小记'), h('span', null, '想吃甜时的陪伴'), h('span', null, '不清零的小进步'))),
     h('section', { className: 'auth-card' }, h('span', { className: 'auth-eyebrow' }, mode === 'login' ? 'WELCOME BACK' : 'A NEW BEGINNING'),
-      h('h2', null, mode === 'login' ? '欢迎回来' : '创建你的账号'), h('p', null, mode === 'login' ? '登录后继续你的旅程。' : '从今天开始，为自己留一份记录。'),
+      h('h2', null, mode === 'login' ? '欢迎回来' : '创建你的账号'), h('p', null, mode === 'login' ? '回到自己的节奏，继续今天的小选择。' : '从一杯饮品、一个小选择开始。'),
       h('form', { onSubmit: submit },
         h('label', null, '邮箱', h('input', { type: 'email', name: 'email', autoComplete: 'username', required: true, maxLength: 254, value: email, onChange: event => setEmail(event.target.value), placeholder: 'you@example.com', disabled: busy })),
         h('label', null, '密码', h('input', { type: 'password', name: 'password', autoComplete: mode === 'login' ? 'current-password' : 'new-password', required: true, minLength: mode === 'register' ? 12 : 1, maxLength: 128, value: password, onChange: event => setPassword(event.target.value), placeholder: mode === 'register' ? '至少 12 位字符' : '输入你的密码', disabled: busy })),
@@ -123,8 +123,8 @@ function AccountPanel({ analytics, journalCount }) {
   }
   return h('section', { className: 'account-panel' }, h('span', { className: 'auth-eyebrow' }, 'YOUR SPACE'), h('h1', null, '我的账号'),
     h('p', { className: 'account-email' }, user.email), h('p', { className: 'auth-note' }, `加入于 ${new Date(user.createdAt).toLocaleDateString()}`),
-    h('div', { className: 'account-stats' }, h('div', null, h('strong', null, analytics?.currentStreakLabel || '0 days'), h('span', null, '当前坚持')), h('div', null, h('strong', null, journalCount), h('span', null, '日记'))),
-    h('section', { className: 'account-section' }, h('h2', null, '数据与隐私'), h('p', null, '日记、会话、课程和游戏进度随账号保存。你可以下载自己的完整记录。'), h('a', { className: 'auth-link', href: '/api/account/export', download: 'quittr-data.json' }, '导出我的数据')),
+    h('div', { className: 'account-stats' }, h('div', null, h('strong', null, analytics?.currentStreakLabel || '0 days'), h('span', null, '留意自己的日子')), h('div', null, h('strong', null, journalCount), h('span', null, '日记'))),
+    h('section', { className: 'account-section' }, h('h2', null, '数据与隐私'), h('p', null, '饮食、渴望、回顾、日记和对话随账号保存。你可以导出完整数据；旧版历史也会保留在导出文件中。'), h('a', { className: 'auth-link', href: '/api/account/export', download: 'qingtian-data.json' }, '导出我的数据')),
     h('section', { className: 'account-section' }, h('h2', null, '修改密码'), h('form', { onSubmit: changePassword },
       h('label', null, '当前密码', h('input', { type: 'password', autoComplete: 'current-password', required: true, maxLength: 128, value: currentPassword, onChange: event => setCurrentPassword(event.target.value) })),
       h('label', null, '新密码', h('input', { type: 'password', autoComplete: 'new-password', required: true, minLength: 12, maxLength: 128, value: password, onChange: event => setPassword(event.target.value) })),

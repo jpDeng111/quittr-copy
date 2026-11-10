@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 def render(size, target):
-    colors = [(20, 37, 30), (178, 235, 201), (224, 236, 208)]
+    colors = [(232, 237, 223), (91, 115, 85), (170, 190, 147)]
     rows = []
     for y in range(size):
         row = bytearray([0])
@@ -15,10 +15,10 @@ def render(size, target):
             samples = []
             for dy, dx in [(0.25, 0.25), (0.25, 0.75), (0.75, 0.25), (0.75, 0.75)]:
                 px, py = (x + dx) * 512 / size, (y + dy) * 512 / size
-                ring = abs(math.hypot(px - 249, py - 259) - 111) <= 18.5
+                ring = abs(math.hypot(px - 256, py - 256) - 108) <= 7 or (math.hypot(px - 256, py - 256) <= 102 and py >= 256)
                 t = max(0, min(1, ((px - 288) + (py - 303)) / 136))
-                tail = math.hypot(px - (288 + 68 * t), py - (303 + 68 * t)) <= 18.5
-                star = abs(px - 371) + abs(py - 142) <= 36 and min(abs(px - 371), abs(py - 142)) <= 9
+                tail = False
+                star = False
                 samples.append(colors[2 if star else 1 if ring or tail else 0])
             row.extend(round(sum(c[i] for c in samples) / 4) for i in range(3))
         rows.append(bytes(row))

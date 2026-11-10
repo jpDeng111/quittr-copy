@@ -8,6 +8,7 @@ const { readCompletionStream } = require("./public/event-stream");
 const { createStore, current, failure, chatHistory } = require("./storage");
 const { createAuth, publicUser } = require("./auth");
 const { createCommunity } = require("./community");
+const { initialSugar, addSugarLog, addCraving, checkIn, setPreferences, summary, dateKey } = require('./sugar');
 
 const ROOT_DIR = __dirname;
 loadEnvFile(path.join(ROOT_DIR, ".env"));
@@ -32,9 +33,9 @@ function requestServices() {
   const context = current();
   if (!context) throw failure(401, "请先登录。");
   if (context.services) return context.services;
-  context.services = { melius: createMeliusService({ readState: readQuittrState, writeState: writeQuittrState, complete: requestMeliusCompletion, streamComplete: (payload, { onDelta }) => requestMeliusCompletion({ ...payload, stream: true }, { onDelta, timeoutMs: 60000 }) }),
+  context.services = { melius: createMeliusService({ domain: 'sugar', readState: readSugarState, writeState: writeSugarState, complete: requestMeliusCompletion, streamComplete: (payload, { onDelta }) => requestMeliusCompletion({ ...payload, stream: true }, { onDelta, timeoutMs: 60000 }) }),
     lessons: createLessonService({
-      readState: readQuittrState, writeState: writeQuittrState,
+      domain: 'sugar', readState: readSugarState, writeState: writeSugarState,
       complete: payload => requestMeliusCompletion(payload, { model: LESSON_MODEL_NAME, timeoutMs: LESSON_TIMEOUT_MS }),
       modelName: LESSON_MODEL_NAME,
       onError: (error, attempt) => console.warn(`[lesson] generation attempt ${attempt + 1} failed: ${error.message}`)
@@ -93,6 +94,7 @@ const server = http.createServer(async (req, res) => {
 async function handleRequest(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
+    if (url.pathname.startsWith('/api/blocker/') || url.pathname === '/api/quittr/relapses') return sendJson(res, 410, { error: '此功能已随轻甜减糖版停用。旧数据仍保留，可在个人数据导出中查看。' });
     const mobileAssets = {
       '/mobile.css': ['mobile.css', 'text/css; charset=utf-8'],
       '/mobile.js': ['mobile.js', 'application/javascript; charset=utf-8'],
@@ -129,11 +131,40 @@ async function handleRequest(req, res) {
     }
 
     if (req.method === "GET" && url.pathname === "/api/account/bootstrap") {
-      const state = readQuittrState();
-      return sendJson(res, 200, { user: publicUser(current().user), preferences: state.preferences || {}, chat: chatHistory(state) });
+      const state = readSugarState();
+      return sendJson(res, 200, { user: publicUser(current().user), preferences: readQuittrState().preferences || {}, chat: chatHistory(state) });
     }
     if (req.method === "GET" && url.pathname === "/api/melius/history") {
-      return sendJson(res, 200, chatHistory(readQuittrState(), { before: url.searchParams.get("before"), limit: url.searchParams.get("limit") }));
+      return sendJson(res, 200, chatHistory(readSugarState(), { before: url.searchParams.get("before"), limit: url.searchParams.get("limit") }));
+    }
+    if (req.method === 'GET' && url.pathname === '/api/sugar/state') return sendJson(res, 200, summary(readSugarState(), url.searchParams.get('timeZone') || 'Asia/Shanghai'));
+    if (req.method === 'GET' && url.pathname === '/api/sugar/journal') return sendJson(res, 200, { entries: readSugarState().journalEntries });
+    if (req.method === 'POST' && url.pathname === '/api/sugar/journal') {
+      const body = await readJson(req);
+      const state = readSugarState();
+      const content = String(body.body || '').trim().slice(0, 5000);
+      if (!content) return sendJson(res, 400, { error: '写下一点感受再保存吧。' });
+      if (!/^[\w-]{8,128}$/.test(body.clientId || '')) return sendJson(res, 400, { error: '记录标识无效。' });
+      const previous = state.journalEntries.find(entry => entry.clientId === body.clientId);
+      const title = String(body.title || '').trim().slice(0, 100) || '工作日的一小页';
+      if (previous && (previous.body !== content || previous.title !== title)) return sendJson(res, 409, { error: '记录标识已使用，请重新打开表单。' });
+      const entry = previous || { id: crypto.randomUUID(), clientId: body.clientId, title, body: content, category: 'reflection', createdAt: new Date().toISOString() };
+      if (!previous) writeSugarState({ ...state, journalEntries: [entry, ...state.journalEntries] });
+      return sendJson(res, 200, { entry });
+    }
+    if (req.method === 'POST' && ['/api/sugar/logs', '/api/sugar/cravings', '/api/sugar/check-in', '/api/sugar/preferences'].includes(url.pathname)) {
+      const body = await readJson(req);
+      const timeZone = body.timeZone || 'Asia/Shanghai';
+      dateKey(new Date(), timeZone);
+      const state = readSugarState();
+      let next, entry;
+      if (url.pathname.endsWith('/preferences')) next = setPreferences(state, body);
+      else {
+        const result = url.pathname.endsWith('/logs') ? addSugarLog(state, body) : url.pathname.endsWith('/cravings') ? addCraving(state, body) : checkIn(state, body);
+        next = result.state; entry = result.entry;
+      }
+      writeSugarState(next);
+      return sendJson(res, 200, { entry, summary: summary(next, timeZone) });
     }
     if (req.method === "GET" && url.pathname === "/api/account/export") {
       res.setHeader("Content-Disposition", 'attachment; filename="quittr-data.json"');
@@ -234,58 +265,6 @@ async function handleRequest(req, res) {
 
     if (req.method === "POST" && url.pathname === "/api/quittr/reasons") {
       return await handleQuittrReasons(req, res);
-    }
-
-    if (req.method === "GET" && url.pathname === "/api/blocker/state") {
-      return sendJson(res, 200, getBlockerState());
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/protection") {
-      return await handleBlockerProtection(req, res);
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/tier1") {
-      return await handleBlockerTier1(req, res);
-    }
-
-    if (req.method === "GET" && url.pathname === "/api/blocker/websites") {
-      return sendJson(res, 200, { websites: getBlockerWebsites() });
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/websites") {
-      return await handleBlockerAddWebsite(req, res);
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/websites/remove") {
-      return await handleBlockerRemoveWebsite(req, res);
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/tier2") {
-      return await handleBlockerTier2(req, res);
-    }
-
-    if (req.method === "GET" && url.pathname === "/api/blocker/apps") {
-      return sendJson(res, 200, { apps: getBlockerApps() });
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/apps") {
-      return await handleBlockerAddApp(req, res);
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/apps/remove") {
-      return await handleBlockerRemoveApp(req, res);
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/tier3") {
-      return await handleBlockerTier3(req, res);
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/blocker/tier3/unlock") {
-      return await handleBlockerTier3Unlock(req, res);
-    }
-
-    if (req.method === "GET" && url.pathname === "/api/blocker/screentime") {
-      return sendJson(res, 200, getBlockerScreenTime());
     }
 
     if (req.method === "GET" && url.pathname === "/api/community/posts") {
@@ -539,6 +518,21 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 function readQuittrState() {
   if (!current()) throw failure(401, "请先登录。");
   return structuredClone(current().state);
+}
+
+// Keep the previous product's records intact, without feeding them into the
+// sugar companion, lessons or timeline. Tables and account IDs stay unchanged.
+function readSugarState() {
+  const state = readQuittrState();
+  if (!state.sugar) { state.sugar = initialSugar(); writeQuittrState(state); }
+  const turns = Object.entries(state.meliusTurns || {}).filter(([id]) => id.startsWith('sugar_')).map(([id, turn]) => [id.slice(6), turn]);
+  return { ...initialSugar(), ...state.sugar, journalEntries: (state.journalEntries || []).filter(entry => entry.product === 'sugar'), meliusTurns: Object.fromEntries(turns) };
+}
+function writeSugarState(next) {
+  const state = readQuittrState();
+  const { journalEntries = [], meliusTurns = {}, ...sugar } = next;
+  const turns = Object.fromEntries(Object.entries(meliusTurns).map(([id, turn]) => [`sugar_${id}`, { ...turn, product: 'sugar' }]));
+  writeQuittrState({ ...state, sugar, journalEntries: [...(state.journalEntries || []).filter(entry => entry.product !== 'sugar'), ...journalEntries.map(entry => ({ ...entry, product: 'sugar' }))], meliusTurns: { ...state.meliusTurns, ...turns } });
 }
 
 function writeQuittrState(state) {
@@ -803,244 +797,4 @@ function loadEnvFile(filePath) {
 
 function getErrorMessage(error) {
   return error instanceof Error ? error.message : String(error);
-}
-
-const DEFAULT_ADULT_DOMAINS = [
-  "pornhub.com", "xvideos.com", "xnxx.com", "xhamster.com", "redtube.com",
-  "youporn.com", "tube8.com", "spankbang.com", "brazzers.com", "onlyfans.com",
-  "chaturbate.com", "stripchat.com", "cam4.com", "livejasmin.com", "bongacams.com",
-  "eporner.com", "tnaflix.com", "beeg.com", "daftsex.com", "xmoviesforyou.com"
-];
-
-const AVAILABLE_APPS = [
-  { id: "safari", name: "Safari", category: "Browser" },
-  { id: "chrome", name: "Chrome", category: "Browser" },
-  { id: "youtube", name: "YouTube", category: "Entertainment" },
-  { id: "instagram", name: "Instagram", category: "Social" },
-  { id: "tiktok", name: "TikTok", category: "Social" },
-  { id: "x", name: "X (Twitter)", category: "Social" },
-  { id: "reddit", name: "Reddit", category: "Social" },
-  { id: "snapchat", name: "Snapchat", category: "Social" },
-  { id: "facebook", name: "Facebook", category: "Social" },
-  { id: "twitch", name: "Twitch", category: "Entertainment" },
-  { id: "netflix", name: "Netflix", category: "Entertainment" },
-  { id: "discord", name: "Discord", category: "Communication" },
-  { id: "telegram", name: "Telegram", category: "Communication" },
-  { id: "whatsapp", name: "WhatsApp", category: "Communication" }
-];
-
-function createDefaultBlockerState(now = new Date()) {
-  return {
-    protectionEnabled: false,
-    tier1: {
-      enabled: false,
-      presetDomains: DEFAULT_ADULT_DOMAINS.slice(),
-      customWebsites: []
-    },
-    tier2: {
-      enabled: false,
-      screenTimeIntegration: false,
-      apps: []
-    },
-    tier3: {
-      enabled: false,
-      lockedAt: null,
-      passcodeHash: null
-    },
-    screenTime: {
-      todayMinutes: 0,
-      pickups: 0,
-      updatedAt: now.toISOString()
-    },
-    updatedAt: now.toISOString()
-  };
-}
-
-function getBlockerState() {
-  const state = readQuittrState();
-  if (!state.blocker || !state.blocker.tier1) {
-    const blocker = createDefaultBlockerState();
-    writeQuittrState({ ...state, blocker, updatedAt: new Date().toISOString() });
-    return blocker;
-  }
-  return state.blocker;
-}
-
-function writeBlockerState(blocker) {
-  const state = readQuittrState();
-  const updatedAt = new Date().toISOString();
-  blocker.updatedAt = updatedAt;
-  writeQuittrState({ ...state, blocker, updatedAt });
-  return blocker;
-}
-
-function getBlockerWebsites() {
-  const blocker = getBlockerState();
-  const preset = (blocker.tier1.presetDomains || []).map((domain) => ({ domain, preset: true }));
-  const custom = (blocker.tier1.customWebsites || []).map((domain) => ({ domain, preset: false }));
-  return [...preset, ...custom];
-}
-
-function getBlockerApps() {
-  const blocker = getBlockerState();
-  return blocker.tier2.apps || [];
-}
-
-function getBlockerScreenTime() {
-  const blocker = getBlockerState();
-  return blocker.screenTime || { todayMinutes: 0, pickups: 0 };
-}
-
-function normalizeDomain(input) {
-  return String(input || "")
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, "")
-    .replace(/^www\./, "")
-    .replace(/\/.+$/, "");
-}
-
-function hashPasscode(passcode) {
-  return crypto.createHash("sha256").update(String(passcode || "")).digest("hex");
-}
-
-async function handleBlockerProtection(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const blocker = getBlockerState();
-  const enabled = Boolean(body.enabled);
-  blocker.protectionEnabled = enabled;
-  if (enabled && !blocker.tier1.enabled) {
-    blocker.tier1.enabled = true;
-  }
-  if (!enabled) {
-    if (blocker.tier3.enabled) {
-      return sendJson(res, 403, { error: "Permanent lock is active. Protection cannot be turned off." });
-    }
-    blocker.tier1.enabled = false;
-    blocker.tier2.enabled = false;
-  }
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, updated);
-}
-
-async function handleBlockerTier1(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const blocker = getBlockerState();
-  blocker.tier1.enabled = Boolean(body.enabled);
-  if (blocker.tier1.enabled) {
-    blocker.protectionEnabled = true;
-  } else if (!blocker.tier2.enabled) {
-    blocker.protectionEnabled = false;
-  }
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, updated);
-}
-
-async function handleBlockerAddWebsite(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const domain = normalizeDomain(body.website || body.domain);
-  if (!domain || !domain.includes(".")) {
-    return sendJson(res, 400, { error: "Please enter a valid website domain." });
-  }
-  const blocker = getBlockerState();
-  const presetDomains = blocker.tier1.presetDomains || [];
-  const customWebsites = blocker.tier1.customWebsites || [];
-  if (presetDomains.includes(domain) || customWebsites.includes(domain)) {
-    return sendJson(res, 409, { error: "This website is already blocked." });
-  }
-  customWebsites.push(domain);
-  blocker.tier1.customWebsites = customWebsites;
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, { websites: getBlockerWebsites(), blocker: updated });
-}
-
-async function handleBlockerRemoveWebsite(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const domain = normalizeDomain(body.website || body.domain);
-  const blocker = getBlockerState();
-  blocker.tier1.customWebsites = (blocker.tier1.customWebsites || []).filter((item) => item !== domain);
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, { websites: getBlockerWebsites(), blocker: updated });
-}
-
-async function handleBlockerTier2(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const blocker = getBlockerState();
-  blocker.tier2.enabled = Boolean(body.enabled);
-  if (blocker.tier2.enabled) {
-    blocker.tier2.screenTimeIntegration = true;
-    if (!blocker.tier1.enabled) {
-      blocker.tier1.enabled = true;
-      blocker.protectionEnabled = true;
-    }
-  }
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, updated);
-}
-
-async function handleBlockerAddApp(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const appId = String(body.appId || body.id || "").trim();
-  const appDef = AVAILABLE_APPS.find((app) => app.id === appId);
-  if (!appDef) {
-    return sendJson(res, 400, { error: "Unknown app." });
-  }
-  const blocker = getBlockerState();
-  const apps = blocker.tier2.apps || [];
-  if (apps.some((app) => app.id === appId)) {
-    return sendJson(res, 409, { error: "This app is already blocked." });
-  }
-  apps.push({ id: appDef.id, name: appDef.name, category: appDef.category, blockedAt: new Date().toISOString() });
-  blocker.tier2.apps = apps;
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, { apps: getBlockerApps(), blocker: updated });
-}
-
-async function handleBlockerRemoveApp(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const appId = String(body.appId || body.id || "").trim();
-  const blocker = getBlockerState();
-  if (blocker.tier3.enabled) {
-    return sendJson(res, 403, { error: "Permanent lock is active. Apps cannot be removed." });
-  }
-  blocker.tier2.apps = (blocker.tier2.apps || []).filter((app) => app.id !== appId);
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, { apps: getBlockerApps(), blocker: updated });
-}
-
-async function handleBlockerTier3(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const passcode = String(body.passcode || "").trim();
-  if (passcode.length < 4) {
-    return sendJson(res, 400, { error: "Passcode must be at least 4 digits." });
-  }
-  const blocker = getBlockerState();
-  if ((blocker.tier2.apps || []).length === 0) {
-    return sendJson(res, 400, { error: "Add at least one app to block before enabling permanent lock." });
-  }
-  blocker.tier3.enabled = true;
-  blocker.tier3.lockedAt = new Date().toISOString();
-  blocker.tier3.passcodeHash = hashPasscode(passcode);
-  blocker.tier2.enabled = true;
-  blocker.tier1.enabled = true;
-  blocker.protectionEnabled = true;
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, updated);
-}
-
-async function handleBlockerTier3Unlock(req, res) {
-  const body = await readJson(req).catch(() => ({}));
-  const passcode = String(body.passcode || "").trim();
-  const blocker = getBlockerState();
-  if (!blocker.tier3.enabled) {
-    return sendJson(res, 400, { error: "Permanent lock is not active." });
-  }
-  if (hashPasscode(passcode) !== blocker.tier3.passcodeHash) {
-    return sendJson(res, 403, { error: "Incorrect passcode. The permanent lock remains in place." });
-  }
-  blocker.tier3.enabled = false;
-  blocker.tier3.lockedAt = null;
-  blocker.tier3.passcodeHash = null;
-  const updated = writeBlockerState(blocker);
-  sendJson(res, 200, updated);
 }

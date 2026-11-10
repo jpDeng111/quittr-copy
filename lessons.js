@@ -62,8 +62,11 @@ function collectWindow(state, dates, days, limits) {
   const completedLessons = Object.values(state.dailyLessons || {}).filter((lesson) => inWindow(lesson.completedAt))
     .sort(newestFirst('completedAt')).slice(0, 3)
     .map((lesson) => ({ title: lesson.title, takeaway: lesson.takeaway, reflection: lesson.reflection || '', intention: lesson.intention || '' }));
-  const total = conversations.length + journals.length + urges.length + checkIns.length + relapseCount + completedLessons.length;
-  return { start, conversations, journals, urges, checkIns, relapseCount, completedLessons, total };
+  const sugarLogs = (state.logs || []).filter(entry => inWindow(entry.createdAt)).slice(0, 12).map(({ name, scene, sugarKind, sugarGrams, note, createdAt }) => ({ name, scene, sugarKind, sugarGrams, note, at: createdAt }));
+  const sugarCravings = (state.cravings || []).filter(entry => inWindow(entry.createdAt)).slice(0, 8);
+  const sugarCheckIns = (state.checkIns || []).filter(entry => inWindow(entry.createdAt)).slice(0, 8);
+  const total = conversations.length + journals.length + urges.length + checkIns.length + relapseCount + completedLessons.length + sugarLogs.length + sugarCravings.length + sugarCheckIns.length;
+  return { start, conversations, journals, urges, checkIns, relapseCount, completedLessons, sugarLogs, sugarCravings, sugarCheckIns, total };
 }
 
 function buildLessonContext(state, dates) {
@@ -93,6 +96,9 @@ function sourceSummary(context) {
     context.checkIns.length ? `${prefix}${context.checkIns.length} 次打卡` : '',
     context.relapseCount ? `${prefix}恢复记录` : '',
     context.completedLessons.length ? `${prefix}小课反馈` : ''
+    , context.sugarLogs?.length ? `${prefix}${context.sugarLogs.length} 条饮食记录` : ''
+    , context.sugarCravings?.length ? `${prefix}${context.sugarCravings.length} 次想吃甜的时刻` : ''
+    , context.sugarCheckIns?.length ? `${prefix}${context.sugarCheckIns.length} 次减糖回顾` : ''
   ].filter(Boolean);
 }
 
@@ -151,13 +157,13 @@ function parseGeneratedLesson(data, base, modelName) {
   return { ...base, origin: 'ai', model: modelName || '', title: clean(draft.title, 52), subtitle: clean(draft.subtitle, 100), reason: base.hasActivity ? clean(draft.reason, 140) : '还没有昨天的记录，这是 Melius 为你准备的觉察入门课。', category: clean(draft.category, 20) || base.category, theme: ['tide', 'bloom', 'dawn', 'orbit'].includes(draft.theme) ? draft.theme : 'tide', takeaway: clean(draft.takeaway, 100), cards };
 }
 
-function promptMessages(context, previousLesson) {
+function promptMessages(context, previousLesson, domain) {
   const windowNote = context.windowDays <= 1
     ? '素材窗口：昨天一天。'
     : `素材窗口：${context.windowLabel}（不是昨天，最早的记录在 ${context.windowFrom}）。不要把这些事写成“昨天你…”，用“最近”“前几天”这类说法。`;
   return [
     { role: 'system', content: [
-      '你是 QUITTR 的 Melius 每日小课堂编辑。根据用户真实的对话和记录，制作一节温暖、准确、可操作的中文微课程。像视觉小课堂一样，一张卡片只讲一个概念，用日常比喻、一个过程图和一个小练习帮助理解。',
+      domain === 'sugar' ? '你是轻甜的减糖小课堂编辑，面向25–35岁职场女性的工作日生活。围绕真实的咖啡、下午茶、会议零食和加班场景制作温和、可执行的小课，不根据性别推断体型、情绪、健康状况或生活偏好。只帮助减少不必要的添加糖，不鼓励戒碳水、戒完整水果、跳过正餐、饥饿忍耐或热量补偿；不承诺减肥、美肤、逆龄、排毒或治疗糖瘾。区分添加糖与总糖，不从食物名称估算糖克数。没有记录时明确是精选入门课。' : '你是 Melius 每日小课堂编辑。根据用户真实的对话和记录，制作一节温暖、准确、可操作的中文微课程。',
       windowNote,
       '这节小课必须只属于这个人：优先抓住素材里具体的场景、时间、地点、感受、触发点或一句原话，让至少两张卡片直接呼应它们。不要写成任何人都适用的通稿，也不要罗列全部记录；选一个最有帮助的角度深挖。',
       '推荐原因要像 Melius 写给你的短便笺，用第二人称，不用“用户”“基于记录”等报告式表达。不提大脑、神经回路、多巴胺或补偿等生物学推断，不引用没有提供的研究，不使用疗效百分比；只解释可观察的情绪、环境和习惯过程。',
@@ -171,13 +177,23 @@ function promptMessages(context, previousLesson) {
   ];
 }
 
-function createLessonService({ readState, writeState, complete, now = () => new Date(), modelName = '', onError = () => {} }) {
+function createLessonService({ readState, writeState, complete, now = () => new Date(), modelName = '', onError = () => {}, domain = 'legacy' }) {
   const inFlight = new Map();
   function snapshot(timeZone) {
     const dates = lessonDates(now(), timeZone);
     const state = readState();
     const context = buildLessonContext(state, dates);
     const base = starterLesson(dates, context);
+    if (domain === 'sugar') {
+      Object.assign(base, { title: '下午茶，\n可以多一个选择。', subtitle: '把喜欢的甜，留给真正想享用的时刻。', category: '工作日减糖', takeaway: '先问问自己需要什么，再选一份适合此刻的照顾。' });
+      base.cards = [
+        { kind: 'insight', label: '换一个角度', title: '减一点糖，\n不用少一点快乐。', body: '减糖可以从一杯饮品的选择开始，不需要把每一口甜都变成考验。喜欢的甜食，也可以有意识地享用。', highlight: '调整一个选择，而不是要求自己完美。', steps: [] },
+        { kind: 'pattern', label: '看见工作日的习惯', title: '是想喝奶茶，\n还是需要一个暂停？', body: '同事点单、会议间隙或忙完一项任务，都可能成为习惯的提示。留意当时的需要，下一次就多一个选择。', highlight: '场景 → 此刻的需要 → 一个小选择', steps: ['留意场景', '辨认需要', '再做选择'] },
+        { kind: 'practice', label: '试试这个小练习', title: '点单前，\n给自己一分钟。', body: '先看看自己是饿了、累了，还是确实想享受这杯饮品。饿了就正常吃饭，不用靠忍耐来完成目标。', highlight: '暂停是为了选择，不是为了强忍。', steps: ['放松肩膀，自然呼吸', '问一句：我现在需要什么？', '选一杯喜欢且适合此刻的饮品'] },
+        { kind: 'reflection', label: '照顾真实的需要', title: '今天工作里，\n你最需要什么？', body: '没有标准答案，也不需要因为想吃甜食而批评自己。', highlight: '找到需要，比给自己打分更有用。', steps: ['正常吃一顿饭', '短暂休息', '和同事聊两句', '只是想享用一份甜'] },
+        { kind: 'action', label: '明天只做一件事', title: '把小改变，\n放进熟悉的工作日。', body: '选一个愿意尝试的动作，做不到也不清零已有记录。', highlight: '记录是线索，不是成绩单。', steps: ['点单时看看无额外加糖选项', '下午茶前先正常吃午餐', '分享一份喜欢的甜点'] }
+      ];
+    }
     const lessons = Object.values(state.dailyLessons || {}).filter((lesson) => lesson.timeZone === dates.timeZone && lesson.date <= dates.today);
     const latestFirst = (a, b) => b.date.localeCompare(a.date) || (b.revision || 0) - (a.revision || 0);
     const lesson = lessons.filter((item) => item.date === dates.today).sort(latestFirst)[0] || base;
@@ -210,10 +226,14 @@ function createLessonService({ readState, writeState, complete, now = () => new 
           try {
             const data = await complete({
               temperature: temperatures[attempt], max_tokens: 2600, response_format: { type: 'json_object' },
-              messages: promptMessages(context, previousLesson)
+              messages: promptMessages(context, previousLesson, domain)
             });
             if (data?.choices?.[0]?.finish_reason === 'length') throw new Error('Lesson response was truncated');
             const generated = parseGeneratedLesson(data, nextBase, modelName);
+            if (domain === 'sugar') {
+              if (/色情|戒色|破戒|抗糖逆龄|戒掉碳水|不吃正餐|补偿热量|保证减肥|排毒瘦身/.test(JSON.stringify(generated))) throw new Error('Lesson is outside the sugar companion domain');
+              if (!generated.hasActivity) generated.reason = '还没有过往的减糖记录，这是小轻为你准备的工作日入门课。';
+            }
             const contentKey = (item) => JSON.stringify([item.title, item.subtitle, item.takeaway, item.cards]);
             if (force && contentKey(generated) === contentKey(lesson)) throw Object.assign(new Error('Duplicate lesson content'), { duplicate: true });
             // A preview that was already on screen can still be completed after a refresh.

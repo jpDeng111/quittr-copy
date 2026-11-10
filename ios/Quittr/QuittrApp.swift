@@ -8,7 +8,7 @@ struct QuittrApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                Color(red: 7/255, green: 8/255, blue: 8/255).ignoresSafeArea()
+                Color(red: 247/255, green: 246/255, blue: 241/255).ignoresSafeArea()
                 if model.server == nil {
                     ServerSettings(model: model, firstLaunch: true)
                 } else {
@@ -25,7 +25,7 @@ struct QuittrApp: App {
                     }
                 }
             }
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(.light)
             .sheet(isPresented: $model.showSettings) { ServerSettings(model: model, firstLaunch: false) }
             .sheet(item: $model.sharedFile, onDismiss: { model.clearSharedFile() }) { file in ShareSheet(url: file.url) }
             .onOpenURL { _ in /* Server login stays inside the configured origin. */ }
@@ -46,9 +46,9 @@ struct ServerSettings: View {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("✦ QUITTR").font(.title2.bold()).foregroundStyle(.mint)
-                        Text("连接你的恢复空间").font(.title.bold())
-                        Text("输入运行 Quittr 的服务器地址。登录后即可继续使用同一账号的日记、会话和进度。")
+                        Text("◒ 轻甜").font(.title2.bold()).foregroundStyle(.mint)
+                        Text("连接你的减糖空间").font(.title.bold())
+                        Text("输入运行轻甜 的服务器地址。登录后即可继续使用同一账号的日记、会话和进度。")
                             .font(.subheadline).foregroundStyle(.secondary)
                     }.padding(.vertical, 14)
                 }
@@ -79,11 +79,11 @@ struct ServerSettings: View {
                     }.disabled(saving).frame(maxWidth: .infinity, minHeight: 32)
                 }
             }
-            .navigationTitle(firstLaunch ? "欢迎使用 Quittr" : "服务器设置")
+            .navigationTitle(firstLaunch ? "欢迎使用轻甜" : "服务器设置")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { if !firstLaunch { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } } } }
             .onAppear { address = model.server?.absoluteString ?? "" }
-        }.preferredColorScheme(.dark)
+        }.preferredColorScheme(.light)
     }
 }
 

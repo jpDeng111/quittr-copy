@@ -41,7 +41,7 @@ function MobileInstallHelp() {
   if (standalone) return null;
   return h('div', { className: 'mobile-install' },
     h('button', { type: 'button', className: 'auth-link', 'aria-expanded': open, onClick: () => setOpen(value => !value) }, '在 iPhone 上添加到主屏幕 ↗'),
-    open && h('div', { className: 'install-instructions' }, h('strong', null, '把 Quittr 放到主屏幕'),
+    open && h('div', { className: 'install-instructions' }, h('strong', null, '把轻甜放到主屏幕'),
       h('p', null, '用 iPhone 的 Safari 打开此服务，轻点分享按钮，选择「添加到主屏幕」，再轻点「添加」。'),
       h('p', null, '手机需能连接到这台服务器。主屏幕版本可能需要重新登录，同一账号的记录会自动恢复。')));
 }

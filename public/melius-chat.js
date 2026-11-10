@@ -112,7 +112,7 @@ function MeliusArtifactCard({ card, onDiscuss }) {
     } catch { setCopyState('复制失败，可长按文字复制'); }
   }
   return h('article', { className: `melius-artifact artifact-${card.kind}`, 'aria-label': `${variant.label}：${card.title}` },
-    h('header', { className: 'artifact-top' }, h('span', { className: 'artifact-brand' }, h('span', { className: 'artifact-spark', 'aria-hidden': true }, '✦'), 'MELIUS'), h('span', { className: 'artifact-type' }, variant.label)),
+    h('header', { className: 'artifact-top' }, h('span', { className: 'artifact-brand' }, h('span', { className: 'artifact-spark', 'aria-hidden': true }, '✦'), '小轻 · 轻甜'), h('span', { className: 'artifact-type' }, variant.label)),
     h('div', { className: 'artifact-heading' }, h('span', { className: 'artifact-eyebrow' }, variant.english), h('h3', null, card.title), h('p', null, card.body), h('span', { className: 'artifact-emblem', 'aria-hidden': true }, variant.icon)),
     h('div', { className: 'artifact-items' }, card.items.map((item, index) => card.kind === 'plan' ?
       h('button', { key: index, type: 'button', className: `artifact-item${selected === index ? ' is-chosen' : ''}`, 'aria-pressed': selected === index, onClick: () => setSelected(selected === index ? null : index) },
@@ -121,7 +121,7 @@ function MeliusArtifactCard({ card, onDiscuss }) {
     h('div', { className: 'artifact-takeaway' }, h('span', { 'aria-hidden': true }, '✧'), h('p', null, card.takeaway)),
     card.kind === 'plan' && h('small', { className: 'artifact-selection', role: 'status' }, selected === null ? '选一件，先试试看。' : `想先试试：${card.items[selected].title}`),
     h('footer', { className: 'artifact-footer' }, h('button', { type: 'button', onClick: () => onDiscuss(card), 'aria-label': `继续聊「${card.title}」` }, '继续聊这个', h('span', { 'aria-hidden': true }, '↗')), h('button', { type: 'button', onClick: copy, 'aria-label': '复制卡片' }, copyState || '复制卡片')),
-    h('span', { className: 'artifact-note' }, 'Melius 为你整理 · 建议卡片')
+    h('span', { className: 'artifact-note' }, '小轻为你整理 · 建议卡片')
   );
 }
 
@@ -131,7 +131,7 @@ function ChatActionCard({ action, onAction }) {
     h("span", { className: "chat-action-icon" }, h(Icon, { name: breathing ? "wind" : action.type === "game" ? "brain" : "check-circle" })),
     h("div", null, h("strong", null, breathing ? "深呼吸练习" : action.title), h("p", null, action.detail),
       h("button", { type: "button", onClick: () => onAction(action.type === "game" ? `melius game ${action.gameId}` : action.route) },
-        breathing ? "进入呼吸练习" : action.type === "game" ? "打开游戏" : action.route === "reasons" ? "查看动力" : action.route === "journal" ? "查看日记" : "查看统计", h(Icon, { name: "chevron" }))
+        breathing ? "进入呼吸练习" : action.type === "game" ? "打开游戏" : action.route === "reasons" ? "查看动力" : action.route === "journal" ? "查看日记" : "查看记录", h(Icon, { name: "chevron" }))
     )
   );
 }
@@ -242,8 +242,8 @@ function MeliusChatPage({ chat, onAction, onBack }) {
 
   return h("section", { className: "chat-page" },
     h("header", { className: "chat-header" },
-      h("button", { type: "button", onClick: onBack, "aria-label": "Back to analytics" }, h(Icon, { name: "chevron-left" })),
-      h("span", null, h("strong", null, "Melius"), h("small", null, "聊一聊，也可以一起做点改变")),
+      h("button", { type: "button", onClick: onBack, "aria-label": "返回今日" }, h(Icon, { name: "chevron-left" })),
+      h("span", null, h("strong", null, "小轻"), h("small", null, "不催你改变，陪你找到自己的选择")),
       h("button", { type: "button", className: "chat-journal-link", onClick: () => onAction("journal"), "aria-label": "查看日记" }, h(Icon, { name: "journal" }))
     ),
     h("div", { className: "chat-thread", "aria-label": "Conversation" },
@@ -251,8 +251,8 @@ function MeliusChatPage({ chat, onAction, onBack }) {
       chat.historyError ? h("p", { role: "alert", className: "auth-error" }, chat.historyError) : null,
       messages.length === 0 ? h("div", { className: "empty-chat" },
         h("span", { className: "chat-welcome-icon" }, h(Icon, { name: "melius" })),
-        h("strong", null, "从一句话开始"), h("p", null, "感受、动力或一次小小的进步，都可以告诉我。\n明确的记录会归入日记与统计。"),
-        h("div", { className: "chat-suggestions" }, ["给我一张今晚不熬夜的行动卡", "用小卡片讲讲冲动和行动的区别", "做做深呼吸", "帮我复盘今天的感受"].map((text) => h("button", { key: text, type: "button", onClick: () => setDraft(text) }, text)))
+        h("strong", null, "忙碌的间隙，先照顾一下自己"), h("p", null, "下午茶、同事点单，或只是今天有点累。\n我们从真实的需要开始，不给每一口甜打分。"),
+        h("div", { className: "chat-suggestions" }, ["同事又在点奶茶，我也有点想喝", "下午三点很累，帮我想个小调整", "做做深呼吸", "刚才吃了蛋糕，我想温和地复盘一下"].map((text) => h("button", { key: text, type: "button", onClick: () => setDraft(text) }, text)))
       ) : null,
       messages.map((message) => h("div", { key: message.id, className: `chat-message ${message.role}${message.actions?.some((action) => action.type === "content_card") ? " has-artifact" : ""}` },
         message.text ? h("p", { className: `chat-bubble ${message.role}${message.status === "streaming" ? " is-streaming" : ""}` }, message.role === "assistant" ? renderChatText(message.text) : message.text) : null,
@@ -264,7 +264,7 @@ function MeliusChatPage({ chat, onAction, onBack }) {
         ) : null
       )),
       isSending ? h("div", { className: "chat-pending", role: "status" },
-        !messages.some((message) => message.status === "streaming") ? h("p", { className: "chat-bubble assistant is-thinking" }, elapsed >= 20 ? "回复比平时久一点，记录不会重复保存…" : "Melius 正在回复…") : null,
+        !messages.some((message) => message.status === "streaming") ? h("p", { className: "chat-bubble assistant is-thinking" }, elapsed >= 20 ? "回复比平时久一点，记录不会重复保存…" : "小轻正在回复…") : null,
         h("button", { type: "button", onClick: chat.stopWaiting }, "停止输出")
       ) : null,
       h("div", { ref: endRef })
@@ -279,23 +279,5 @@ function MeliusChatPage({ chat, onAction, onBack }) {
       ),
       h("small", { className: "chat-input-hint" }, "语音先转文字，再发送 · 未收到回复可重提")
     )
-  );
-}
-
-function JournalPage({ entries, onAction, onBack }) {
-  const [category, setCategory] = useState("all");
-  const labels = { all: "全部", reflection: "日记", motivation: "动力", post_relapse: "破戒复盘", check_in: "未破戒" };
-  const visible = entries.filter((entry) => category === "all" || (entry.category || "reflection") === category);
-  return h("section", { className: "journal-archive" },
-    h("header", { className: "chat-header" }, h("button", { type: "button", onClick: onBack, "aria-label": "Back" }, h(Icon, { name: "chevron-left" })),
-      h("span", null, h("strong", null, "Journal"), h("small", null, "把每一步改变留在这里")),
-      h("button", { type: "button", className: "chat-journal-link", onClick: () => onAction("new entry"), "aria-label": "New entry" }, h(Icon, { name: "edit" }))
-    ),
-    h("nav", { className: "journal-filters", "aria-label": "Journal categories" }, Object.entries(labels).map(([key, label]) => h("button", { key, type: "button", className: category === key ? "is-active" : "", "aria-pressed": category === key, onClick: () => setCategory(key) }, label))),
-    visible.length ? visible.map((entry) => h("article", { key: entry.id, className: "journal-record" },
-      h("header", null, h("span", null, labels[entry.category || "reflection"] || "日记"), h("time", null, new Date(entry.createdAt).toLocaleString("zh-CN", { dateStyle: "medium", timeStyle: "short" }))),
-      h("h2", null, entry.title), h("p", null, entry.body),
-      entry.sourceQuote ? h("details", null, h("summary", null, "查看对话原文"), h("blockquote", null, entry.sourceQuote)) : null
-    )) : h("p", { className: "journal-empty" }, "这里还没有记录。你可以在 Melius 里聊聊，或手动写一篇日记。")
   );
 }
