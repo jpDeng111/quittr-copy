@@ -94,7 +94,9 @@ npm test
 
 浏览器验证使用临时数据库，不写正式用户数据。可通过 `node tests/helpers/mobile-fixture.js` 启动本机 QA 服务，示例凭据仅属于临时测试环境。
 
-[iOS 安装说明](ios/README.md)。当前环境只有 Command Line Tools，能做 Swift 语法与项目/plist 检查，**尚未完成 iOS 模拟器编译、签名或真机测试**。`ops/github-actions.yml` 是未启用的构建模板；当前 GitHub OAuth 凭据没有 `workflow` 权限，因此不会把模板直接上传为工作流，也不会宣称 CI 或 iOS 编译已通过。
+[iOS 安装说明](ios/README.md)。2026-11-10 已使用 **Xcode 16.3** 编译 Debug 模拟器版本，并安装、启动于 **iPhone 16 / iOS 18.4**，连接本机 `http://localhost:3000` 后登录页显示正常。系统默认仍选择 Command Line Tools，构建时用 `DEVELOPER_DIR` 指向完整 Xcode，无需修改系统设置。模拟器首次设置默认填写本机地址；首次连接不再等待无历史会话的 WebKit 数据清理，切换已有服务器仍清除原登录状态。**尚未完成开发者签名、真机测试及 App Store 发布**；登录后的全部流程也不能仅凭启动验证视为已通过。
+
+`ops/github-actions.yml` 是未启用的构建模板；当前 GitHub OAuth 凭据没有 `workflow` 权限，因此不会把模板直接上传为工作流。以上为本机实际构建结果，不代表 GitHub CI 已运行。
 
 ## 技术栈
 

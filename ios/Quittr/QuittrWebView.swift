@@ -65,6 +65,13 @@ final class QuittrWebModel: NSObject, ObservableObject, WKNavigationDelegate, WK
 
     func configure(_ url: URL, completion: @escaping () -> Void) {
         if server == url { reload(); completion(); return }
+        // A fresh installation has no previous server session to clear. Avoid
+        // waiting for WebKit's data processes before the first page is loaded.
+        if server == nil {
+            server = url
+            UserDefaults.standard.set(url.absoluteString, forKey: "serverOrigin")
+            reload(); completion(); return
+        }
         webView.stopLoading()
         webView.configuration.websiteDataStore.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast) { [weak self] in
             DispatchQueue.main.async {

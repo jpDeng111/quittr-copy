@@ -48,7 +48,7 @@ struct ServerSettings: View {
                     VStack(alignment: .leading, spacing: 14) {
                         Text("◒ 轻甜").font(.title2.bold()).foregroundStyle(.mint)
                         Text("连接你的减糖空间").font(.title.bold())
-                        Text("输入运行轻甜 的服务器地址。登录后即可继续使用同一账号的日记、会话和进度。")
+                        Text("输入运行轻甜的服务器地址。登录后即可继续使用同一账号的日记、会话和进度。")
                             .font(.subheadline).foregroundStyle(.secondary)
                     }.padding(.vertical, 14)
                 }
@@ -57,8 +57,13 @@ struct ServerSettings: View {
                         .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                         .accessibilityLabel("服务器地址")
                     #if DEBUG
+                    #if targetEnvironment(simulator)
+                    Text("模拟器可填 http://localhost:3000，连接这台 Mac 上的轻甜服务。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    #else
                     Text("局域网调试可填 http://电脑的局域网IP:3000。iPhone 与电脑需要处于同一网络；不要填写 localhost。")
                         .font(.footnote).foregroundStyle(.secondary)
+                    #endif
                     #else
                     Text("正式版本使用 HTTPS 地址。").font(.footnote).foregroundStyle(.secondary)
                     #endif
@@ -82,7 +87,13 @@ struct ServerSettings: View {
             .navigationTitle(firstLaunch ? "欢迎使用轻甜" : "服务器设置")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { if !firstLaunch { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } } } }
-            .onAppear { address = model.server?.absoluteString ?? "" }
+            .onAppear {
+                #if DEBUG && targetEnvironment(simulator)
+                address = model.server?.absoluteString ?? "http://localhost:3000"
+                #else
+                address = model.server?.absoluteString ?? ""
+                #endif
+            }
         }.preferredColorScheme(.light)
     }
 }

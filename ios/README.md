@@ -27,15 +27,19 @@
 
 ## 验证边界
 
-当前开发环境只有 Xcode Command Line Tools，没有完整 Xcode / iOS SDK，因此已验证 Swift 语法、项目文件和 plist 格式，以及网页手机尺寸下的实际交互；**没有完成 iOS 模拟器编译、签名或真机测试**。可在安装 Xcode 后运行：
+2026-11-10 已使用 **Xcode 16.3 / iOS 18.4 SDK** 成功编译 Debug 版本，安装并启动于 **iPhone 16 / iOS 18.4 模拟器**。已通过界面确认连接 `http://localhost:3000` 后显示轻甜登录页；没有替用户注册或登录正式账号。尚未完成开发者签名、真机测试、登录后的全部原生交互或 App Store 发布。
+
+系统 `xcode-select -p` 仍可能指向 Command Line Tools；本次仅在构建命令中指定完整 Xcode，不修改全局路径：
 
 ```bash
-xcodebuild -project ios/Quittr.xcodeproj -scheme Quittr -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project ios/Quittr.xcodeproj -scheme Quittr -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath ios/DerivedData CODE_SIGNING_ALLOWED=NO build
 ```
+
+也可在 Xcode 中打开工程，选择 `Quittr` scheme 和已安装的 iPhone 模拟器后运行。**模拟器**可以用 `http://localhost:3000` 连接这台 Mac，因此 Debug 模拟器首次设置会预填该地址；**真机**仍需填写电脑的局域网地址或 HTTPS 域名。首次连接跳过无历史会话的数据清理，切换已有服务器时仍清理原登录与缓存，防止混用账号。
 
 当前工程是自托管服务的 iOS 容器客户端，尚未提交 App Store。后续上架需要实际设备验证、正式 HTTPS 服务、隐私政策和与实际数据处理一致的 App Privacy 信息；苹果是否接受取决于最终产品和审核。
 
-仓库提供 `ops/github-actions.yml` 自动测试/模拟器构建模板。当前用于上传的 OAuth 凭据没有 `workflow` scope，GitHub 拒绝直接创建工作流，所以模板尚未启用。具备工作流管理权限后，将其放到 `.github/workflows/ci.yml` 即可触发；在此之前不能把上传代码视为 iOS 编译通过。
+仓库提供 `ops/github-actions.yml` 自动测试/模拟器构建模板。当前用于上传的 OAuth 凭据没有 `workflow` scope，GitHub 拒绝直接创建工作流，所以模板尚未启用。具备工作流管理权限后，将其放到 `.github/workflows/ci.yml` 即可触发；以上本机模拟器构建成功不代表 GitHub CI 已运行。
 
 安全区实现参考 [WebKit 文档](https://webkit.org/blog/7929/designing-websites-for-iphone-x/)，客户端使用 [WKWebView](https://developer.apple.com/documentation/webkit/wkwebview)。
 
