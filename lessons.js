@@ -108,11 +108,11 @@ function starterLesson(dates, context) {
     windowDays: context.windowDays || 1, windowLabel: context.windowLabel || '昨天',
     takeaway: '我可以感受到冲动，也可以选择暂时不行动。',
     cards: [
-      { kind: 'insight', label: '换一个视角', title: '有冲动，\n不代表你退步了。', body: '冲动是一种正在发生的感受，不是一道必须执行的命令。练习的起点，是留意它，而不是责怪自己。', highlight: '感受 ≠ 行动', steps: [] },
-      { kind: 'pattern', label: '看见这个过程', title: '找到习惯中，\n可以暂停的一格。', body: '一个场景可能唤起感受，感受又可能带来惯常反应。把它们分开看，就能多发现一个可选择的时刻。', highlight: '在反应之前，先停一停。', steps: ['注意到触发', '说出感受', '选择下一步'] },
-      { kind: 'practice', label: '一起练习 · 60 秒', title: '先不用解决，\n只陪自己一分钟。', body: '找一个舒服的姿势。无需强迫自己平静，只要尝试以下三个小动作。', highlight: '目标是留出空间，不是立刻消除冲动。', steps: ['双脚落地，感受身体被支撑。', '自然呼吸，留意一次吸气和呼气。', '轻轻说：我注意到自己有一个冲动。'] },
-      { kind: 'reflection', label: '给自己一个回答', title: '此刻的你，\n更需要什么？', body: '有时，我们想要的是休息、连接，或短暂离开压力。没有标准答案，选择最贴近当下的一个。', highlight: '先看见需要，再寻找照顾它的方式。', steps: ['休息一下', '有人陪伴', '放松身体', '暂时还不清楚'] },
-      { kind: 'action', label: '带走一个小行动', title: '下一次冲动来时，\n先做一件小事。', body: '给自己留一个容易执行的替代动作：起身倒一杯水、走到窗边，或找信任的人聊一句。选一个就够了。', highlight: '先暂停，再选择。', steps: ['起身喝一杯水', '走到窗边透透气', '找一个人聊聊'] }
+      { kind: 'insight', label: '换一个视角', title: '有冲动，\n不代表你退步了。', body: '冲动是一种正在发生的感受，不是一道必须执行的命令。练习的起点，是留意它，而不是责怪自己。', annotations: [{ text: '正在发生的感受', style: 'highlight' }, { text: '留意它', style: 'circle' }], highlight: '感受 ≠ 行动', steps: [] },
+      { kind: 'pattern', label: '看见这个过程', title: '找到习惯中，\n可以暂停的一格。', body: '一个场景可能唤起感受，感受又可能带来惯常反应。把它们分开看，就能多发现一个可选择的时刻。', annotations: [{ text: '把它们分开看', style: 'underline' }, { text: '可选择的时刻', style: 'circle' }], highlight: '在反应之前，先停一停。', steps: ['注意到触发', '说出感受', '选择下一步'] },
+      { kind: 'practice', label: '一起练习 · 60 秒', title: '先不用解决，\n只陪自己一分钟。', body: '找一个舒服的姿势。无需强迫自己平静，只要尝试以下三个小动作。', annotations: [{ text: '无需强迫自己平静', style: 'highlight' }], highlight: '目标是留出空间，不是立刻消除冲动。', steps: ['双脚落地，感受身体被支撑。', '自然呼吸，留意一次吸气和呼气。', '轻轻说：我注意到自己有一个冲动。'] },
+      { kind: 'reflection', label: '给自己一个回答', title: '此刻的你，\n更需要什么？', body: '有时，我们想要的是休息、连接，或短暂离开压力。没有标准答案，选择最贴近当下的一个。', annotations: [{ text: '没有标准答案', style: 'underline' }, { text: '最贴近当下', style: 'circle' }], highlight: '先看见需要，再寻找照顾它的方式。', steps: ['休息一下', '有人陪伴', '放松身体', '暂时还不清楚'] },
+      { kind: 'action', label: '带走一个小行动', title: '下一次冲动来时，\n先做一件小事。', body: '给自己留一个容易执行的替代动作：起身倒一杯水、走到窗边，或找信任的人聊一句。选一个就够了。', annotations: [{ text: '容易执行的替代动作', style: 'highlight' }, { text: '选一个就够了', style: 'circle' }], highlight: '先暂停，再选择。', steps: ['起身喝一杯水', '走到窗边透透气', '找一个人聊聊'] }
     ]
   };
 }
@@ -136,18 +136,64 @@ function extractJson(text) {
   }
 }
 
+const UNSUPPORTED_CLAIM = /神经回路|神经通路|多巴胺|治愈|治好|脑损伤|重塑大脑|修复大脑|科学证明|研究表明|\d+\s*%/;
+
+function parseLessonCard(card, index, base) {
+  if (index >= 5 || card.kind !== CARD_KINDS[index] || !clean(card.title) || !clean(card.body) || !clean(card.highlight)) throw new Error('Incomplete lesson card');
+  if (UNSUPPORTED_CLAIM.test(JSON.stringify(card))) throw new Error('Unsupported health claim in lesson');
+  const steps = Array.isArray(card.steps) ? card.steps.map((step) => clean(step, 90)).filter(Boolean).slice(0, 4) : [];
+  if (index > 0 && steps.length < 2) throw new Error('Missing lesson exercise');
+  const body = clean(card.body, 200);
+  // Annotations must quote the actual body. They can never inject markup or new claims.
+  const annotations = [];
+  for (const item of Array.isArray(card.annotations) ? card.annotations : []) {
+    const text = clean(item?.text, 24);
+    if (text.length < 2 || text.length > 16 || !body.includes(text) || annotations.some((a) => a.text === text)) continue;
+    annotations.push({ text, style: ['underline', 'circle', 'highlight'].includes(item.style) ? item.style : 'underline' });
+    if (annotations.length === 3) break;
+  }
+  return { kind: CARD_KINDS[index], label: clean(card.label, 24) || base.cards[index].label, title: clean(card.title, 52), body, highlight: clean(card.highlight, 90), steps, annotations };
+}
+
+// Read only fully closed card objects from the top-level cards array. Braces,
+// escaped quotes and the word "cards" inside JSON strings cannot end a card.
+function completedDraftCards(text) {
+  let quoted = false, escaped = false, depth = 0, arrayStart = -1;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) { if (escaped) escaped = false; else if (ch === '\\') escaped = true; else if (ch === '"') quoted = false; continue; }
+    if (ch === '"') {
+      const match = depth === 1 && text.slice(i).match(/^"cards"\s*:\s*\[/);
+      if (match) { arrayStart = i + match[0].length; break; }
+      quoted = true;
+    } else if (ch === '{' || ch === '[') depth++;
+    else if (ch === '}' || ch === ']') depth--;
+  }
+  if (arrayStart < 0) return [];
+  const cards = [];
+  let start = -1;
+  depth = 0; quoted = false; escaped = false;
+  for (let i = arrayStart; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) { if (escaped) escaped = false; else if (ch === '\\') escaped = true; else if (ch === '"') quoted = false; continue; }
+    if (ch === '"') quoted = true;
+    else if (ch === '{' || ch === '[') { if (depth === 0) start = i; depth++; }
+    else if (ch === '}' || ch === ']') {
+      if (depth === 0) break;
+      depth--;
+      if (depth === 0 && start >= 0) { cards.push(JSON.parse(text.slice(start, i + 1))); start = -1; if (cards.length === 5) break; }
+    }
+  }
+  return cards;
+}
+
 function parseGeneratedLesson(data, base, modelName) {
   const text = messageText(data);
   if (!text || text.length > 30000) throw new Error('Invalid lesson response');
   const draft = extractJson(text);
   if (!clean(draft.title) || !clean(draft.subtitle) || !clean(draft.reason) || !clean(draft.takeaway) || !Array.isArray(draft.cards) || draft.cards.length !== 5) throw new Error('Incomplete lesson');
-  if (/神经回路|神经通路|多巴胺|治愈|治好|脑损伤|重塑大脑|修复大脑|科学证明|研究表明|\d+\s*%/.test(JSON.stringify(draft))) throw new Error('Unsupported health claim in lesson');
-  const cards = draft.cards.map((card, index) => {
-    if (card.kind !== CARD_KINDS[index] || !clean(card.title) || !clean(card.body) || !clean(card.highlight)) throw new Error('Incomplete lesson card');
-    const steps = Array.isArray(card.steps) ? card.steps.map((step) => clean(step, 90)).filter(Boolean).slice(0, 4) : [];
-    if (index > 0 && steps.length < 2) throw new Error('Missing lesson exercise');
-    return { kind: CARD_KINDS[index], label: clean(card.label, 24) || base.cards[index].label, title: clean(card.title, 52), body: clean(card.body, 200), highlight: clean(card.highlight, 90), steps };
-  });
+  if (UNSUPPORTED_CLAIM.test(JSON.stringify(draft))) throw new Error('Unsupported health claim in lesson');
+  const cards = draft.cards.map((card, index) => parseLessonCard(card, index, base));
   return { ...base, origin: 'ai', model: modelName || '', title: clean(draft.title, 52), subtitle: clean(draft.subtitle, 100), reason: base.hasActivity ? clean(draft.reason, 140) : '还没有昨天的记录，这是 Melius 为你准备的觉察入门课。', category: clean(draft.category, 20) || base.category, theme: ['tide', 'bloom', 'dawn', 'orbit'].includes(draft.theme) ? draft.theme : 'tide', takeaway: clean(draft.takeaway, 100), cards };
 }
 
@@ -165,13 +211,13 @@ function promptMessages(context, previousLesson) {
       '避免重复recentTopics中最近讲过的主题，可以在小课反馈上自然延伸。如果有previousLesson，说明用户主动要求换一课：换一个不同的教学重点（例如上一节讲识别念头，这一节就讲环境调整、替代动作或事后复盘），换一个比喻，四张卡片的标题、正文和小标题都要有明显差别，不能只改封面或换措辞。仍要基于相同的真实记录，也不能为了新鲜而虚构经历。',
       '不做诊断、不提供药物建议、不编造研究/概率/大脑恢复天数、不承诺治愈、不带羞耻或色情描写。不把“必须控制住”作为目标。肯定小进步。用“可能、可以尝试”表达推断。',
       '仅返回JSON对象，不要代码块标记或任何解释：title(20字内，可含换行), subtitle(40字内), category(8字内), theme(tide/bloom/dawn/orbit), reason(60字内、根据实际素材说明为什么推荐、不暴露私密细节), takeaway(35字内), cards(恰好5张)。',
-      '每张卡片包含kind,label(12字内),title(20字内，可含换行),body(60-100字),highlight(30字内),steps(字符串数组)。顺序固定：insight(换个视角，steps为空)，pattern(看见触发到反应的过程，steps为3个简短节点)，practice(可在60秒内尝试的练习，steps为3个具体动作)，reflection(一个与主题相关的问题，steps为3-4个适合单选的感受/需要答案)，action(今天可以做的小行动，steps为3个可单选的行动)。'
+      '每张卡片包含kind,label(12字内),title(20字内，可含换行),body(60-100字),highlight(30字内),steps(字符串数组),annotations(1-3个正文重点标注，包含text和style)。text必须逐字摘自body，为2-12字的短语；style从underline下划线、circle圈出、highlight荧光笔中选择，突出具体概念和可做的动作，不能标整段。JSON按封面字段在前、cards在后输出，卡片字段按kind,label,title,body,annotations,highlight,steps的顺序输出。顺序固定：insight(换个视角，steps为空)，pattern(看见触发到反应的过程，steps为3个简短节点)，practice(可在60秒内尝试的练习，steps为3个具体动作)，reflection(一个与主题相关的问题，steps为3-4个适合单选的感受/需要答案)，action(今天可以做的小行动，steps为3个可单选的行动)。'
     ].join('\n') },
     { role: 'user', content: JSON.stringify({ ...context, previousLesson }) }
   ];
 }
 
-function createLessonService({ readState, writeState, complete, now = () => new Date(), modelName = '', onError = () => {} }) {
+function createLessonService({ readState, writeState, complete, streamComplete, now = () => new Date(), modelName = '', onError = () => {} }) {
   const inFlight = new Map();
   function snapshot(timeZone) {
     const dates = lessonDates(now(), timeZone);
@@ -193,11 +239,21 @@ function createLessonService({ readState, writeState, complete, now = () => new 
   }
   return {
     get(timeZone = 'Asia/Shanghai') { const { lesson, history } = snapshot(timeZone); return { lesson, history }; },
-    async generate(timeZone = 'Asia/Shanghai', { force = false } = {}) {
+    async generate(timeZone = 'Asia/Shanghai', { force = false, onEvent } = {}) {
       const { lesson, context, base } = snapshot(timeZone);
       // 只有已经由 AI 生成过的课程才跳过；精选入门课和完成过的旧课都会被真正的个性化课程替换。
       if (!force && lesson.origin === 'ai') return this.get(timeZone);
-      if (inFlight.has(base.id)) return inFlight.get(base.id);
+      if (inFlight.has(base.id)) {
+        const active = inFlight.get(base.id);
+        if (onEvent) { active.events.forEach(onEvent); active.listeners.add(onEvent); }
+        return active.promise;
+      }
+      const active = { events: [], listeners: new Set(onEvent ? [onEvent] : []) };
+      const emit = (event) => {
+        if (event.type === 'reset') active.events = [];
+        active.events.push(event);
+        for (const listener of active.listeners) { try { listener(event); } catch {} }
+      };
       // New content gets a new identity; old readers and their completion records stay valid.
       const replaceExisting = force || Boolean(lesson.completedAt);
       const nextBase = replaceExisting ? { ...base, id: `${base.id}-r${crypto.randomUUID()}`, dayId: base.id, revision: (lesson.revision || 0) + 1 } : base;
@@ -208,12 +264,26 @@ function createLessonService({ readState, writeState, complete, now = () => new 
         const temperatures = force ? [0.9, 1] : [0.7, 0.5];
         for (let attempt = 0; attempt < 2; attempt += 1) {
           try {
-            const data = await complete({
-              temperature: temperatures[attempt], max_tokens: 2600, response_format: { type: 'json_object' },
+            emit({ type: 'reset', attempt: attempt + 1 });
+            let draftText = '', sent = 0;
+            const onDelta = (delta) => {
+              draftText += delta;
+              if (draftText.length > 30000) throw new Error('Invalid lesson response');
+              const cards = completedDraftCards(draftText);
+              while (sent < cards.length) {
+                const card = parseLessonCard(cards[sent], sent, nextBase);
+                emit({ type: 'card', index: sent, card });
+                sent++;
+              }
+            };
+            const payload = {
+              temperature: temperatures[attempt], max_tokens: 3800, response_format: { type: 'json_object' },
               messages: promptMessages(context, previousLesson)
-            });
+            };
+            const data = streamComplete ? await streamComplete(payload, { onDelta }) : await complete(payload);
             if (data?.choices?.[0]?.finish_reason === 'length') throw new Error('Lesson response was truncated');
             const generated = parseGeneratedLesson(data, nextBase, modelName);
+            while (sent < generated.cards.length) { emit({ type: 'card', index: sent, card: generated.cards[sent] }); sent++; }
             const contentKey = (item) => JSON.stringify([item.title, item.subtitle, item.takeaway, item.cards]);
             if (force && contentKey(generated) === contentKey(lesson)) throw Object.assign(new Error('Duplicate lesson content'), { duplicate: true });
             // A preview that was already on screen can still be completed after a refresh.
@@ -225,13 +295,15 @@ function createLessonService({ readState, writeState, complete, now = () => new 
             onError(error, attempt);
           }
         }
+        emit({ type: 'reset', failed: true });
         return { ...this.get(timeZone), generationError: lastError?.duplicate
           ? '这次生成的内容与上一课相同，已保留原课程，请再试一次。'
           : lesson.origin === 'ai' || lesson.completedAt
             ? '这次没有生成成功，原来的课程和学习记录已保留。你可以稍后重试。'
             : '专属小课暂时没有生成成功。先读精选小课，也可以稍后重试。' };
       })().finally(() => inFlight.delete(base.id));
-      inFlight.set(base.id, task);
+      active.promise = task;
+      inFlight.set(base.id, active);
       return task;
     },
     complete({ id, timeZone = 'Asia/Shanghai', origin, reflection, intention }) {
@@ -246,4 +318,4 @@ function createLessonService({ readState, writeState, complete, now = () => new 
   };
 }
 
-module.exports = { createLessonService, lessonDates, buildLessonContext, parseGeneratedLesson };
+module.exports = { createLessonService, lessonDates, buildLessonContext, parseGeneratedLesson, completedDraftCards };

@@ -36,6 +36,7 @@ function requestServices() {
     lessons: createLessonService({
       readState: readQuittrState, writeState: writeQuittrState,
       complete: payload => requestMeliusCompletion(payload, { model: LESSON_MODEL_NAME, timeoutMs: LESSON_TIMEOUT_MS }),
+      streamComplete: (payload, { onDelta }) => requestMeliusCompletion({ ...payload, stream: true }, { model: LESSON_MODEL_NAME, timeoutMs: LESSON_TIMEOUT_MS, onDelta }),
       modelName: LESSON_MODEL_NAME,
       onError: (error, attempt) => console.warn(`[lesson] generation attempt ${attempt + 1} failed: ${error.message}`)
     }) };
@@ -186,7 +187,20 @@ async function handleRequest(req, res) {
 
     if (req.method === "POST" && url.pathname === "/api/lessons/daily") {
       const body = await readJson(req);
-      return sendJson(res, 200, await lessons.generate(body.timeZone || "Asia/Shanghai", { force: body.regenerate === true }));
+      if (body.stream !== true) return sendJson(res, 200, await lessons.generate(body.timeZone || "Asia/Shanghai", { force: body.regenerate === true }));
+      // Validate before opening SSE so bad time zones retain their HTTP error.
+      lessons.get(body.timeZone || "Asia/Shanghai");
+      res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "Connection": "keep-alive", "X-Accel-Buffering": "no" });
+      res.flushHeaders();
+      const emit = (event, data) => { if (!res.destroyed && !res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+      const heartbeat = setInterval(() => { if (!res.destroyed && !res.writableEnded) res.write(": keepalive\n\n"); }, 12000);
+      res.once("close", () => clearInterval(heartbeat));
+      try {
+        const result = await lessons.generate(body.timeZone || "Asia/Shanghai", { force: body.regenerate === true, onEvent: ({ type, ...data }) => emit(type, data) });
+        emit("done", result);
+      } catch { emit("error", { error: "小课生成中断，请重试。原课程和学习记录已保留。" }); }
+      finally { clearInterval(heartbeat); if (!res.destroyed) res.end(); }
+      return;
     }
 
     if (req.method === "POST" && url.pathname === "/api/lessons/complete") {

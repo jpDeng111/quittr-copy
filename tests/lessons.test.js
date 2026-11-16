@@ -254,3 +254,81 @@ test('generated lessons record the model that wrote them', async () => {
   const result = await service.generate();
   assert.equal(result.lesson.model, 'qwen3.7-plus');
 });
+
+test('closed cards stream before the model finishes, with annotations validated against the body', async () => {
+  let release;
+  const events = [];
+  let state = {};
+  const draft = JSON.parse(generated().choices[0].message.content);
+  draft.cards[0].annotations = [
+    { text: '当下的感受', style: 'circle' },
+    { text: '不在正文里的话', style: 'highlight' },
+    { text: '一个小小的行动', style: 'highlight' }
+  ];
+  const text = JSON.stringify(draft);
+  const boundary = text.indexOf(',{"kind":"pattern"');
+  const service = createLessonService({ readState: () => structuredClone(state), writeState(next) { state = next; },
+    streamComplete: async (_, { onDelta }) => {
+      // Split at every character, including quotes and nested annotation objects.
+      for (const char of text.slice(0, boundary)) onDelta(char);
+      await new Promise((resolve) => { release = resolve; });
+      for (const char of text.slice(boundary)) onDelta(char);
+      return { choices: [{ message: { content: text }, finish_reason: 'stop' }] };
+    }
+  });
+  const pending = service.generate('Asia/Shanghai', { onEvent: (event) => events.push(event) });
+  assert.equal(events.filter((event) => event.type === 'card').length, 1);
+  assert.equal(state.dailyLessons, undefined, 'partial drafts must not be persisted');
+  assert.deepEqual(events[1].card.annotations, [{ text: '当下的感受', style: 'circle' }, { text: '一个小小的行动', style: 'highlight' }]);
+  const replay = [];
+  const concurrent = service.generate('Asia/Shanghai', { onEvent: (event) => replay.push(event) });
+  assert.deepEqual(replay, events, 'reconnecting readers get the same draft');
+  release();
+  const result = await pending;
+  assert.equal((await concurrent).lesson.id, result.lesson.id);
+  assert.equal(events.filter((event) => event.type === 'card').length, 5);
+  assert.deepEqual(result.lesson.cards[0].annotations, events[1].card.annotations);
+});
+
+test('draft parser ignores escaped braces and cards keys in strings or nested metadata', () => {
+  const { completedDraftCards } = require('../lessons');
+  const card = { body: '文字含有 } 和 { 还有 "cards": [ 以及 \\ 引号', steps: [], annotations: [{ text: '文字' }] };
+  const prefix = JSON.stringify({ title: '"cards": [', metadata: { cards: [{ fake: true }] } }).slice(0, -1) + ',"cards":[';
+  const text = JSON.stringify(card);
+  for (let i = 0; i < text.length; i++) assert.deepEqual(completedDraftCards(prefix + text.slice(0, i)), []);
+  assert.deepEqual(completedDraftCards(prefix + text + ',{"body":"unfinished'), [card]);
+});
+
+test('broken stream clears provisional cards, retries, and never overwrites a saved lesson', async () => {
+  let state = {};
+  let attempts = 0;
+  const first = fixture();
+  const lesson = (await first.service.generate()).lesson;
+  state = { dailyLessons: { [lesson.id]: lesson } };
+  const events = [];
+  const draft = JSON.parse(generated({ title: '新的角度' }).choices[0].message.content);
+  const service = createLessonService({ ...first.options, readState: () => structuredClone(state), writeState(next) { state = next; },
+    streamComplete: async (_, { onDelta }) => {
+      attempts++;
+      onDelta('{"cards":[' + JSON.stringify(draft.cards[0]) + ',');
+      throw new Error('connection interrupted');
+    }
+  });
+  const result = await service.generate('Asia/Shanghai', { force: true, onEvent: (event) => events.push(event) });
+  assert.equal(attempts, 2);
+  assert.ok(result.generationError);
+  assert.equal(result.lesson.id, lesson.id);
+  assert.equal(events.at(-1).type, 'reset');
+  assert.equal(events.at(-1).failed, true);
+  assert.equal(Object.keys(state.dailyLessons).length, 1);
+});
+
+test('invalid card claims are rejected before they can appear in the live preview', async () => {
+  const events = [];
+  const service = createLessonService({ readState: () => ({}), writeState() { throw new Error('must not save'); },
+    streamComplete: async (_, { onDelta }) => { onDelta('{"cards":[' + JSON.stringify({ kind: 'insight', title: '不可信内容', body: '研究表明可以治愈', highlight: '不可信', steps: [] }) + ']'); }
+  });
+  const result = await service.generate('Asia/Shanghai', { onEvent: (event) => events.push(event) });
+  assert.ok(result.generationError);
+  assert.equal(events.filter((event) => event.type === 'card').length, 0);
+});

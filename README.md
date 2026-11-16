@@ -60,6 +60,8 @@ Melius 回复通过 SSE 流式传输，文字随模型生成逐段显示；工�
 
 课程模型通过 `LESSON_MODEL`（默认跟随 `MELIUS_MODEL`，即 `qwen3.7-plus`）、超时通过 `LESSON_TIMEOUT_MS`（默认 60 秒）配置，复用 `DASHSCOPE_API_KEY` 与 `DASHSCOPE_BASE_URL`。
 
+课程支持逐卡流式生成：首张卡片通过校验后立即展示，后续卡片继续生成，可从底部目录切换已就绪内容。正文逐字展开，并对模型摘选的原文短语绘制荧光标记、下划线和圈注；支持直接显示全文和减少动态效果的系统偏好。标注随课程保存，重新阅读时仍会呈现。只有完整课程通过校验才写入数据库，重试会清除临时卡片，失败保留原课程及完成记录。`POST /api/lessons/daily` 传入 `stream: true` 时返回 SSE（`reset`、`card`、`done`、`error`），不传仍返回原 JSON。
+
 新增接口：`GET /api/lessons/daily?timeZone=Asia%2FShanghai` 获取今日课程及历史；`POST /api/lessons/daily` 生成并缓存课程；`POST /api/lessons/complete` 保存完成记录与选择。测试使用独立内存状态，不修改实际恢复记录。
 
 ## 当前功能
