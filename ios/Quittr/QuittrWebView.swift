@@ -31,6 +31,7 @@ final class QuittrWebModel: NSObject, ObservableObject, WKNavigationDelegate, WK
         webView = WKWebView(frame: .zero, configuration: config)
         super.init()
         webView.configuration.userContentController.add(WeakBridge(self), name: "quittrNative")
+        webView.configuration.userContentController.addScriptMessageHandler(PlannerBridge(self), contentWorld: .page, name: "quittrPlanner")
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.isOpaque = false
@@ -80,14 +81,14 @@ final class QuittrWebModel: NSObject, ObservableObject, WKNavigationDelegate, WK
         error = nil; loading = true
         webView.load(URLRequest(url: server, cachePolicy: .reloadIgnoringLocalCacheData))
     }
-    private func sameOrigin(_ url: URL) -> Bool {
+    func isTrustedOrigin(_ url: URL) -> Bool {
         guard let server else { return false }
         let port: (URL) -> Int = { $0.port ?? ($0.scheme == "https" ? 443 : 80) }
         return url.scheme == server.scheme && url.host == server.host && port(url) == port(server)
     }
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = action.request.url else { decisionHandler(.cancel); return }
-        if sameOrigin(url) {
+        if isTrustedOrigin(url) {
             if action.shouldPerformDownload { decisionHandler(.download) }
             else if action.targetFrame == nil { webView.load(action.request); decisionHandler(.cancel) }
             else { decisionHandler(.allow) }
@@ -113,7 +114,7 @@ final class QuittrWebModel: NSObject, ObservableObject, WKNavigationDelegate, WK
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) { download.delegate = self }
     func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) { download.delegate = self }
     func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String, completionHandler: @escaping (URL?) -> Void) {
-        guard let url = response.url, sameOrigin(url) else { completionHandler(nil); return }
+        guard let url = response.url, isTrustedOrigin(url) else { completionHandler(nil); return }
         let destination = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString)-quittr-data.json")
         downloads[ObjectIdentifier(download)] = destination
         completionHandler(destination)

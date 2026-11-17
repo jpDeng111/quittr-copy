@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { createMeliusService } = require("./melius");
+const { createPlanService } = require("./plans");
 const { createLessonService } = require("./lessons");
 const { readCompletionStream } = require("./public/event-stream");
 const { createStore, current, failure, chatHistory } = require("./storage");
@@ -32,7 +33,7 @@ function requestServices() {
   const context = current();
   if (!context) throw failure(401, "请先登录。");
   if (context.services) return context.services;
-  context.services = { melius: createMeliusService({ readState: readQuittrState, writeState: writeQuittrState, complete: requestMeliusCompletion, streamComplete: (payload, { onDelta }) => requestMeliusCompletion({ ...payload, stream: true }, { onDelta, timeoutMs: 60000 }) }),
+  context.services = { plans: createPlanService({ readState: readQuittrState, writeState: writeQuittrState }), melius: createMeliusService({ readState: readQuittrState, writeState: writeQuittrState, complete: requestMeliusCompletion, streamComplete: (payload, { onDelta }) => requestMeliusCompletion({ ...payload, stream: true }, { onDelta, timeoutMs: 60000 }) }),
     lessons: createLessonService({
       readState: readQuittrState, writeState: writeQuittrState,
       complete: payload => requestMeliusCompletion(payload, { model: LESSON_MODEL_NAME, timeoutMs: LESSON_TIMEOUT_MS }),
@@ -43,6 +44,7 @@ function requestServices() {
   return context.services;
 }
 const melius = new Proxy({}, { get: (_, method) => (...args) => requestServices().melius[method](...args) });
+const plans = new Proxy({}, { get: (_, method) => (...args) => requestServices().plans[method](...args) });
 const lessons = new Proxy({}, { get: (_, method) => (...args) => requestServices().lessons[method](...args) });
 
 const server = http.createServer(async (req, res) => {
@@ -180,6 +182,11 @@ async function handleRequest(req, res) {
     if (req.method === "POST" && url.pathname === "/api/melius/chat") {
       return await handleMeliusChat(req, res);
     }
+
+    if (req.method === "GET" && url.pathname === "/api/plans") return sendJson(res, 200, plans.list());
+    if (req.method === "GET" && url.pathname.startsWith("/api/plans/")) return sendJson(res, 200, plans.get(url.pathname.slice("/api/plans/".length)));
+    if (req.method === "POST" && url.pathname === "/api/plans/progress") return sendJson(res, 200, plans.progress(await readJson(req)));
+    if (req.method === "GET" && url.pathname === "/plans.js") return serveFile(res, path.join(STATIC_DIR, "plans.js"), "application/javascript; charset=utf-8");
 
     if (req.method === "GET" && url.pathname === "/api/lessons/daily") {
       return sendJson(res, 200, lessons.get(url.searchParams.get("timeZone") || "Asia/Shanghai"));
@@ -370,7 +377,7 @@ async function handleMeliusChat(req, res) {
     const heartbeat = setInterval(() => { if (!res.destroyed && !res.writableEnded) res.write(": keepalive\n\n"); }, 12000);
     res.once("close", () => clearInterval(heartbeat));
     try {
-      const result = await melius.send({ requestId, messages, onEvent: ({ type, ...data }) => emit(type, data) });
+      const result = await melius.send({ requestId, messages, timeZone: body.timeZone || "Asia/Shanghai", onEvent: ({ type, ...data }) => emit(type, data) });
       emit("done", { ...result, model: MELIUS_MODEL_NAME });
     } catch (error) {
       const timedOut = ["TimeoutError", "AbortError"].includes(error.name);
@@ -379,7 +386,7 @@ async function handleMeliusChat(req, res) {
     return;
   }
   try {
-    const result = await melius.send({ requestId, messages });
+    const result = await melius.send({ requestId, messages, timeZone: body.timeZone || "Asia/Shanghai" });
     sendJson(res, 200, { ...result, model: MELIUS_MODEL_NAME });
   } catch (error) {
     const timedOut = error.name === "TimeoutError" || error.name === "AbortError";

@@ -59,7 +59,7 @@ function useMeliusConversation(onUpdated) {
           setMessages((current) => current.flatMap((message) => message.id !== `${id}-reply` ? [message] : message.actions?.length ? [{ ...message, text: "" }] : []));
           return;
         }
-        if (event.type === "card" && event.card?.type === "content_card") {
+        if (event.type === "card" && ["content_card", "task_plan"].includes(event.card?.type)) {
           setMessages((current) => {
             const existing = current.find((message) => message.id === `${id}-reply`);
             const actions = [...(existing?.actions || []).filter((action) => action.id !== event.card.id), event.card];
@@ -80,6 +80,14 @@ function useMeliusConversation(onUpdated) {
         ...current.filter((message) => message.id !== `${id}-reply`).map((message) => message.id === id ? { ...message, status: "answered", error: "", actions: [] } : message),
         { id: `${id}-reply`, role: "assistant", status: "complete", text: result.reply, actions: result.actions || [], createdAt: new Date().toISOString() }
       ]);
+      for (const action of result.actions || []) {
+        if (action.type !== 'task_plan') continue;
+        announcePlanUpdate(action.plan);
+        if (window.webkit?.messageHandlers?.quittrPlanner && action.title === '进度已更新') {
+          try { await callPlannerNative('progress', action.plan); }
+          catch { setMessages(current => current.map(message => message.id === `${id}-reply` ? { ...message, text: message.text + '\n进度已保存在应用中；系统提醒事项暂未更新，可从计划卡片重试同步。' } : message)); }
+        }
+      }
       try { await onUpdated(result.actions || []); } catch {}
       return result;
     } catch (error) {
@@ -246,18 +254,19 @@ function MeliusChatPage({ chat, onAction, onBack }) {
       h("span", null, h("strong", null, "Melius"), h("small", null, "聊一聊，也可以一起做点改变")),
       h("button", { type: "button", className: "chat-journal-link", onClick: () => onAction("journal"), "aria-label": "查看日记" }, h(Icon, { name: "journal" }))
     ),
+    h(MeliusPlansPanel, { onSuggest: setDraft }),
     h("div", { className: "chat-thread", "aria-label": "Conversation" },
       chat.olderCursor ? h("button", { type: "button", className: "auth-link", disabled: isSending || chat.loadingOlder, onClick: chat.loadOlder }, chat.loadingOlder ? "正在加载…" : "加载更早的对话") : null,
       chat.historyError ? h("p", { role: "alert", className: "auth-error" }, chat.historyError) : null,
       messages.length === 0 ? h("div", { className: "empty-chat" },
         h("span", { className: "chat-welcome-icon" }, h(Icon, { name: "melius" })),
         h("strong", null, "从一句话开始"), h("p", null, "感受、动力或一次小小的进步，都可以告诉我。\n明确的记录会归入日记与统计。"),
-        h("div", { className: "chat-suggestions" }, ["给我一张今晚不熬夜的行动卡", "用小卡片讲讲冲动和行动的区别", "做做深呼吸", "帮我复盘今天的感受"].map((text) => h("button", { key: text, type: "button", onClick: () => setDraft(text) }, text)))
+        h("div", { className: "chat-suggestions" }, ["帮我制定一个30天活动计划", "用小卡片讲讲冲动和行动的区别", "做做深呼吸", "帮我复盘今天的感受"].map((text) => h("button", { key: text, type: "button", onClick: () => setDraft(text) }, text)))
       ) : null,
-      messages.map((message) => h("div", { key: message.id, className: `chat-message ${message.role}${message.actions?.some((action) => action.type === "content_card") ? " has-artifact" : ""}` },
+      messages.map((message) => h("div", { key: message.id, className: `chat-message ${message.role}${message.actions?.some((action) => ["content_card", "task_plan"].includes(action.type)) ? " has-artifact" : ""}` },
         message.text ? h("p", { className: `chat-bubble ${message.role}${message.status === "streaming" ? " is-streaming" : ""}` }, message.role === "assistant" ? renderChatText(message.text) : message.text) : null,
         message.status === "interrupted" ? h("small", { className: "chat-interrupted" }, "回复已中断，以上内容可能不完整") : null,
-        ...(message.actions || []).map((action) => action.type === "content_card" ? h(MeliusArtifactCard, { key: action.id, card: action, onDiscuss: (card) => setDraft(`关于「${card.title}」，我想继续聊聊。`) }) : h(ChatActionCard, { key: action.id, action, onAction })),
+        ...(message.actions || []).map((action) => action.type === "task_plan" ? h(MeliusPlanCard, { key: action.id, action }) : action.type === "content_card" ? h(MeliusArtifactCard, { key: action.id, card: action, onDiscuss: (card) => setDraft(`关于「${card.title}」，我想继续聊聊。`) }) : h(ChatActionCard, { key: action.id, action, onAction })),
         message.status === "failed" ? h("div", { className: "chat-retry", role: "alert" },
           h("span", null, message.error || "这条消息还没有收到回复。"),
           h("button", { type: "button", disabled: isSending, onClick: () => retry(message.id) }, h(Icon, { name: "undo" }), "重新发送")

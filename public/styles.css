@@ -5709,3 +5709,53 @@ button.artifact-item:hover { background: #dce5d04d; }
   .lesson-ink.is-drawn path { animation: none; stroke-dashoffset: 0; }
   .studio-filmstrip button { transition: none; }
 }
+
+/* Persistent, actionable plans inside Melius. */
+.melius-plan-shelf { margin: 0 0 12px; border: 1px solid #c4dab826; border-radius: 12px; background: #9bb38608; }
+.plan-shelf-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; background: none; padding: 12px 15px; color: #d5e5cb; font-size: 12px; }
+.plan-shelf-toggle small { color: #8b9a83; font-size: 10px; }
+.plan-shelf-content { padding: 0 12px 12px; max-height: 60vh; overflow-y: auto; }
+.plan-shelf-content .melius-plan-card + .melius-plan-card { margin-top: 14px; }
+.plan-shelf-empty { padding: 12px; color: #a6b09d; font-size: 12px; line-height: 1.9; }
+.plan-shelf-empty button { color: #d8e6c9; background: #b5cc9a14; border-radius: 7px; padding: 10px 12px; }
+.melius-plan-card { width: 100%; max-width: 560px; padding: 23px; background: linear-gradient(145deg, #edf0dc, #e1e7cf); color: #354730; border: 1px solid #f0f0da; border-radius: 16px; box-shadow: 0 12px 35px #0002; }
+.plan-card-heading { display: flex; align-items: center; gap: 12px; }
+.plan-card-symbol { display: grid; place-items: center; width: 35px; height: 35px; border: 1px solid #9eaf8a66; border-radius: 50%; font-size: 20px; }
+.plan-card-heading > div { flex: 1; }
+.plan-card-heading small { color: #869176; font-size: 8px; letter-spacing: 1.8px; }
+.plan-card-heading h3 { margin: 7px 0 0; font-size: 19px; font-family: 'Songti SC', Georgia, serif; font-weight: 500; }
+.plan-duration { text-align: center; font-size: 24px; font-family: Georgia, serif; color: #687d53; }
+.plan-duration small { display: block; letter-spacing: 0; font-size: 9px; }
+.plan-goal { margin: 20px 0; font-size: 12px; line-height: 1.9; color: #728163; }
+.plan-progress-label { display: flex; justify-content: space-between; font-size: 10px; color: #7b8a6a; align-items: center; }
+.plan-progress-label strong { font-family: Georgia, serif; font-size: 22px; font-weight: 400; color: #567146; }
+.plan-progress-track { height: 5px; border-radius: 9px; background: #a5b48e33; margin: 9px 0; overflow: hidden; }
+.plan-progress-track i { display: block; height: 100%; background: #718b54; border-radius: inherit; transition: width .3s; }
+.plan-progress-caption { font-size: 9px; color: #849276; line-height: 1.8; }
+.plan-task-list { margin-top: 18px; }
+.plan-task { display: flex; gap: 10px; padding: 15px 0; border-top: 1px solid #8ba07530; }
+.plan-task-check { flex-shrink: 0; border-radius: 50%; width: 23px; height: 23px; padding: 0; border: 1px solid #8da177; color: #edf0db; background: none; }
+.plan-task.is-complete .plan-task-check { background: #73895b; }
+.plan-task.is-complete .plan-task-copy > strong { text-decoration: line-through; color: #859576; }
+.plan-task-copy { min-width: 0; flex: 1; }
+.plan-task-copy > strong { display: block; font-size: 12px; font-weight: 600; line-height: 1.7; }
+.plan-task-copy > small { display: block; color: #8b987c; font-size: 9px; margin: 5px 0; }
+.plan-task-copy > p { font-size: 11px; line-height: 1.9; color: #7c8a6d; margin: 7px 0 10px; }
+.plan-task-progress { display: flex; gap: 5px; flex-wrap: wrap; }
+.plan-task-progress button { background: #bac6a526; color: #7d8c6a; border: 1px solid transparent; border-radius: 5px; padding: 5px 8px; font-size: 9px; }
+.plan-task-progress button[aria-pressed=true] { border-color: #81966c88; color: #49613b; background: #bdcda44d; }
+.plan-expand { width: 100%; color: #81916d; font-size: 10px; background: none; padding: 8px; }
+.plan-sync-heading { border-top: 1px solid #96a57d44; margin-top: 12px; padding-top: 14px; }
+.plan-sync-toggle { display: flex; width: 100%; justify-content: space-between; background: none; padding: 0; font-size: 11px; color: #61774e; }
+.plan-sync-panel > p { font-size: 10px; line-height: 1.8; color: #81916d; }
+.plan-sync-buttons { display: flex; flex-wrap: wrap; gap: 7px; }
+.plan-sync-buttons button { background: #526e42; color: #ecf0de; padding: 10px 11px; border-radius: 6px; font-size: 10px; }
+.plan-read-completed { margin-top: 13px; padding: 0; color: #6c8356; background: none; font-size: 10px; }
+.plan-sync-panel > small { display: block; font-size: 9px; color: #8c997d; margin-top: 13px; line-height: 1.8; }
+.plan-feedback, .plan-error { font-size: 10px; line-height: 1.8; margin: 13px 0 0; }
+.plan-feedback { color: #607b4b; }
+.plan-error { color: #9d5f4d; }
+.melius-plan-card button:disabled { opacity: .5; cursor: wait; }
+.melius-plan-card button:focus-visible, .plan-shelf-toggle:focus-visible { outline: 2px solid #8fa779; outline-offset: 3px; }
+@media (max-width: 500px) { .melius-plan-card { padding: 18px 16px; } .plan-card-heading h3 { font-size: 17px; } .plan-task-progress button { padding: 6px 7px; } }
+@media (prefers-reduced-motion: reduce) { .plan-progress-track i { transition: none; } }

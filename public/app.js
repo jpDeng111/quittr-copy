@@ -2993,7 +2993,7 @@ async function sendMeliusMessage(messages, requestId, signal, onEvent) {
   const response = await fetch(MELIUS_CHAT_ENDPOINT, {
     method: "POST", signal,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, requestId, stream: true })
+    body: JSON.stringify({ messages, requestId, stream: true, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai" })
   });
   if (response.ok && response.headers.get("Content-Type")?.includes("text/event-stream")) {
     let result;

@@ -82,7 +82,7 @@ test('HTTP registration, account isolation, chat history, restart and session re
   t.after(async () => { await stop(); fs.rmSync(dir, { recursive: true }); });
   for (const route of ['/mobile.css', '/mobile.js', '/manifest.webmanifest', '/sw.js', '/offline.html', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png']) assert.equal((await request(route)).status, 200);
   assert.equal((await request('/manifest.webmanifest')).data.display, 'standalone');
-  for (const route of ['/api/quittr/journal', '/api/melius/history', '/api/quittr/analytics', '/api/account/export', '/api/blocker/state', '/api/community/posts', '/api/lessons/daily']) assert.equal((await request(route)).status, 401);
+  for (const route of ['/api/quittr/journal', '/api/melius/history', '/api/quittr/analytics', '/api/account/export', '/api/blocker/state', '/api/community/posts', '/api/lessons/daily', '/api/plans']) assert.equal((await request(route)).status, 401);
   assert.equal((await request('/api/auth/register', { body: {}, headers: { Origin: 'https://evil.example' } })).status, 403);
   assert.equal((await request('/api/auth/register', { raw: '{bad' })).status, 400);
   assert.equal((await request('/api/auth/register', { raw: JSON.stringify({ value: 'a'.repeat(150000) }) })).status, 413);
@@ -117,6 +117,14 @@ test('HTTP registration, account isolation, chat history, restart and session re
   const ownerView = await request(`/api/community/post?id=${posted.data.post.id}`, { cookie: a.cookie });
   assert.equal(ownerView.data.post.comments.length, 1);
   assert.equal(ownerView.data.post.likedByMe, false);
+  const { makePlan } = require('../plans');
+  const plan = makePlan({ title: '独立计划', goal: '散步', start_date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()), duration_days: 1, activities: [{ title: '散步', detail: '轻松走走', start_day: 1, interval_days: 1, occurrences: 1, time: '19:00', duration_minutes: 20 }] });
+  await app.store.run({ id: a.data.user.id }, () => app.store.write(a.data.user.id, { ...app.store.read(a.data.user.id), plans: { [plan.id]: plan } }));
+  assert.equal((await request('/api/plans', { cookie: b.cookie })).data.plans.length, 0);
+  assert.equal((await request(`/api/plans/${plan.id}`, { cookie: b.cookie })).status, 404);
+  assert.equal((await request('/api/plans/progress', { cookie: b.cookie, body: { planId: plan.id, taskId: plan.tasks[0].id, progress: 100 } })).status, 404);
+  const partial = await request('/api/plans/progress', { cookie: a.cookie, body: { planId: plan.id, taskId: plan.tasks[0].id, progress: 50 } });
+  assert.equal(partial.data.plan.tasks[0].progress, 50);
   const pledge = { timeZone: 'Asia/Shanghai' };
   await request('/api/quittr/pledges', { cookie: a.cookie, body: pledge });
   assert.equal((await request('/api/quittr/pledges', { cookie: a.cookie, body: pledge })).data.pledges.length, 1);

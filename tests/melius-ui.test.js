@@ -19,6 +19,7 @@ function uiHarness(overrides = {}) {
     getClientErrorMessage: (error) => error.message,
     sendMeliusMessage: overrides.sendMeliusMessage || (async () => ({ reply: "回复成功", actions: [] }))
   });
+  vm.runInContext(fs.readFileSync(require.resolve("../public/plans.js"), "utf8"), ctx);
   vm.runInContext(fs.readFileSync(require.resolve("../public/melius-chat.js"), "utf8"), ctx);
   return {
     ctx, values, refs,

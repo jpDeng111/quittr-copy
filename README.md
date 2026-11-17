@@ -64,6 +64,14 @@ Melius 回复通过 SSE 流式传输，文字随模型生成逐段显示；工�
 
 新增接口：`GET /api/lessons/daily?timeZone=Asia%2FShanghai` 获取今日课程及历史；`POST /api/lessons/daily` 生成并缓存课程；`POST /api/lessons/complete` 保存完成记录与选择。测试使用独立内存状态，不修改实际恢复记录。
 
+## 对话计划与待办
+
+在 Melius 中说出目标、周期和合适的活动时间，AI 可使用 `create_plan` 保存 1–90 天的计划，每项活动展开为有独立时间和进度的任务。缺少日期或时间时先澄清；健康和减重目标需要先了解必要情况，不承诺固定结果。用户说出实际完成情况后，可通过 `update_task_progress` 更新确切任务；也可在卡片中选择完成百分比。
+
+「我的计划」提供持久化入口。iOS App 支持用户点击后同步提醒事项／日历、通过系统分享保存备忘录，读取已关联提醒事项的完成记录。网页版支持日历导出和文本复制。备忘录是一次性分享快照；系统同步需要更新 iOS App 并授予对应权限。计划属于当前账号，聊天重试不会重复创建，过期进度更新会提示刷新。
+
+接口：`GET /api/plans`、`GET /api/plans/:id`、`POST /api/plans/progress`。参见 [iOS 说明](ios/README.md)。
+
 ## 当前功能
 
 - 首页恢复进度、里程碑、快捷操作和功能卡片

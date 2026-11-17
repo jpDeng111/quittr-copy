@@ -21,13 +21,23 @@ SwiftUI + WKWebView 客户端，连接这台 Mac 已运行的 Quittr 服务，�
 - 首次局域网连接显示系统权限说明，不会忽略或绕过证书错误。
 - 语音输入可使用 iOS 系统键盘听写；网页 SpeechRecognition 在 WKWebView 中的可用性以系统支持为准。
 
+## 对话计划与系统同步
+
+Melius 可以将明确要求的待办和多日活动计划保存为独立任务。在聊天中的「我的计划」和计划卡片查看日期、具体活动、完成百分比，并可用对话或按钮更新进度。
+
+- 展开「让系统也提醒我」，可选择同步到提醒事项或日历。首次点击才申请系统权限；重复同步使用已保存的系统标识更新现有项目。
+- 提醒事项支持勾选完成；点击「读取提醒事项中的完成记录」可带回应用。应用内按钮或明确的对话进度也会更新已关联的提醒事项。部分进度保存在任务备注，系统勾选仍是未完成／已完成两种状态。
+- 备忘录通过系统分享面板保存，用户选择「备忘录」并完成保存；不会将仅打开分享面板视为保存成功。它是分享时的快照，不会后台双向更新。
+- 网页版可导出 `.ics` 日历文件、复制计划文本；原生同步需要安装包含 `QuittrPlanner.swift` 的新版 iOS App。
+- 日历同步需要完整访问权限，以读取本应用创建的日程进行去重和更新。实现只访问保存过的项目标识，不上传其他日历或提醒事项内容。关联标识按服务器和账号隔离。
+
 ## 主屏幕网页版
 
 也可直接在 Safari 打开服务器，使用「分享 → 添加到主屏幕」。网页已包含应用图标、manifest、安全区和键盘适配。HTTP 局域网能在线使用；Service Worker 和离线提示需要 HTTPS（或浏览器认可的 localhost 安全上下文）。离线时不缓存私人 API 数据、不排队提交日记或消息。
 
 ## 验证边界
 
-当前开发环境只有 Xcode Command Line Tools，没有完整 Xcode / iOS SDK，因此已验证 Swift 语法、项目文件和 plist 格式，以及网页手机尺寸下的实际交互；**没有完成 iOS 模拟器编译、签名或真机测试**。可在安装 Xcode 后运行：
+已使用本机 Xcode 编译检查 iOS 客户端。系统权限弹窗、备忘录保存和日历／提醒事项实际读写仍需在模拟器或真机执行验收；不能把编译成功视为真机同步通过。可运行：
 
 ```bash
 xcodebuild -project ios/Quittr.xcodeproj -scheme Quittr -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
