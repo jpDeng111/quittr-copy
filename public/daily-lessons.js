@@ -74,7 +74,7 @@ function useDailyLessons(clockNow) {
     request(`daily?timeZone=${encodeURIComponent(timeZone)}`, null, controller.signal).then((result) => {
       if (controller.signal.aborted) return;
       setData(result); setLoading(false); setError('');
-      if (result.lesson.origin !== 'ai') generate(controller.signal);
+      if (result.needsGeneration || result.lesson.origin !== 'ai') generate(controller.signal);
     }).catch((err) => { if (!controller.signal.aborted) { setError('小课堂暂时无法加载，请检查连接后重试。'); setLoading(false); } });
     return () => { mountedRef.current = false; controller.abort(); };
   }, [day, timeZone]);

@@ -129,3 +129,15 @@ test('daily lesson browser transport shows streamed cards and discards interrupt
     cleanup();
   }
 });
+
+test('a cached AI lesson flagged for topic-policy refresh triggers automatic generation', async () => {
+  const f=harness(),effects=[];let posts=0;
+  f.ctx.useEffect=effect=>effects.push(effect);f.ctx.AbortController=AbortController;f.ctx.API_BASE='';
+  const lesson={...f.lesson,origin:'ai'};
+  f.ctx.fetch=async(_,options)=>{if(options?.method==='POST'){posts++;return Response.json({lesson,history:[],needsGeneration:false});}return Response.json({lesson,history:[],needsGeneration:true});};
+  f.render('useDailyLessons(Date.now())');const cleanup=effects.at(-1)();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(posts,1);
+  assert.equal(f.render('useDailyLessons(Date.now())').generating,false);
+  cleanup();
+});

@@ -14,7 +14,7 @@ function fixture(initial = {}, complete) {
   return { service: createLessonService(options), state: () => state, calls: () => calls, advance: (date) => { current = new Date(date); }, options };
 }
 function generated(overrides = {}) {
-  return { choices: [{ message: { content: JSON.stringify({ title: '给压力一个出口', subtitle: '先照顾感受，再做选择。', category: '压力与觉察', theme: 'bloom', reason: '昨天你谈到了工作压力，今天一起练习暂停。', takeaway: '我可以先给自己留一点空间。', cards: ['insight', 'pattern', 'practice', 'reflection', 'action'].map((kind) => ({ kind, label: kind, title: '给自己一点空间', body: '注意当下的感受，尝试一个小小的行动。', highlight: '先暂停，再选择。', steps: kind === 'insight' ? [] : ['休息', '喝水', '散步'] })), ...overrides }) } }] };
+  return { choices: [{ message: { content: JSON.stringify({ title: '给压力一个出口', subtitle: '先照顾感受，再做选择。', category: '压力与觉察', theme: 'bloom', reason: '昨天你谈到了工作压力，今天一起练习暂停。', takeaway: '我可以先给自己留一点空间。', cards: ['insight', 'pattern', 'practice', 'reflection', 'action'].map((kind) => ({ kind, label: kind, title: '给自己一点空间', body: ['insight', 'pattern'].includes(kind) ? '在戒色过程中，注意当下的感受，面对色情内容的触发，尝试一个小小的行动。' : '注意当下的感受，尝试一个小小的行动。', highlight: '先暂停，再选择。', steps: kind === 'insight' ? [] : ['休息', '喝水', '散步'] })), ...overrides }) } }] };
 }
 
 test('yesterday uses the client calendar across midnight and DST changes', () => {
@@ -61,9 +61,9 @@ test('AI generation receives actual context and is deduplicated concurrently and
 test('no history is represented honestly even if the model invents a recommendation reason', async () => {
   const f = fixture();
   assert.equal(f.service.get().lesson.hasActivity, false);
-  assert.match(f.service.get().lesson.reason, /还没有昨天的记录/);
+  assert.match(f.service.get().lesson.reason, /还没有昨天与戒色相关的记录/);
   const result = await f.service.generate();
-  assert.match(result.lesson.reason, /还没有昨天的记录/);
+  assert.match(result.lesson.reason, /还没有昨天与戒色相关的记录/);
   assert.deepEqual(result.lesson.sources, []);
 });
 
@@ -139,7 +139,7 @@ test('manual regeneration calls AI again, changes the whole lesson identity, and
     if (round === 2) assert.equal(JSON.parse(payload.messages[1].content).previousLesson.title, '课程 1');
     const data = generated({ title: `课程 ${round}` });
     const draft = JSON.parse(data.choices[0].message.content);
-    draft.cards.forEach((card) => { card.body = `全新内容 ${round}，一起留意今天的感受。`; });
+    draft.cards.forEach((card) => { card.body = `全新内容 ${round}，在戒色过程中留意色情内容的触发，照顾今天的感受。`; });
     data.choices[0].message.content = JSON.stringify(draft);
     return data;
   });
@@ -331,4 +331,114 @@ test('invalid card claims are rejected before they can appear in the live previe
   const result = await service.generate('Asia/Shanghai', { onEvent: (event) => events.push(event) });
   assert.ok(result.generationError);
   assert.equal(events.filter((event) => event.type === 'card').length, 0);
+});
+
+test('off-topic food records cannot redirect the lesson and an older recovery record is used instead', async () => {
+  const f = fixture({
+    meliusTurns: { milk: { createdAt: '2026-11-02T09:00:00Z', userText: '最近想戒奶茶和戒糖，今天又喝了奶茶，很有压力。' } },
+    journalEntries: [{ createdAt: '2026-11-01T09:00:00Z', title: '戒色时的晚间触发', body: '独处时想点开色情内容，后来把手机放远了。' }]
+  }, payload => {
+    assert.match(payload.messages[0].content, /QUITTR 戒色应用/);
+    assert.match(payload.messages[0].content, /第1张卡片必须明确/);
+    assert.match(payload.messages[1].content, /把手机放远/);
+    assert.doesNotMatch(payload.messages[1].content, /奶茶|戒糖/);
+    assert.equal(JSON.parse(payload.messages[1].content).windowDays,14);
+    return generated();
+  });
+  assert.equal((await f.service.generate()).lesson.origin,'ai');
+});
+
+test('only unrelated goals produce an honest recovery starter without inventing pornography history', async () => {
+  const f=fixture({meliusTurns:{one:{createdAt:'2026-11-02T09:00:00Z',userText:'我想30天减重，晚上少喝奶茶。'}}},payload=>{
+    const context=JSON.parse(payload.messages[1].content);
+    assert.equal(context.hasActivity,false);
+    assert.deepEqual(context.conversations,[]);
+    assert.match(payload.messages[0].content,/不能写成用户确实看过/);
+    return generated();
+  });
+  const starter=f.service.get().lesson;
+  assert.equal(starter.hasActivity,false);
+  assert.match(starter.title,/色情内容/);
+  const result=await f.service.generate();
+  assert.match(result.lesson.reason,/还没有昨天与戒色相关的记录/);
+});
+
+test('off-topic generated output and generic habit courses are rejected rather than relabeled', async () => {
+  for(const overrides of [
+    {title:'戒糖小课堂'},
+    {reason:'昨天你提到想少喝奶茶，所以推荐这一课。'},
+    {cards:JSON.parse(generated().choices[0].message.content).cards.map(card=>({...card,body:'学习识别习惯，暂停一下，选择一个替代动作。'}))}
+  ]){
+    const f=fixture({},()=>generated(overrides));
+    const result=await f.service.generate();
+    assert.equal(result.lesson.origin,'starter');
+    assert.match(result.lesson.title,/色情内容/);
+    assert.ok(result.generationError);
+    assert.equal(f.calls(),2);
+    assert.equal(f.state().dailyLessons,undefined);
+  }
+});
+
+test('a milk-tea card is blocked before streaming, then retry streams only the recovery deck', async () => {
+  let state={},round=0;
+  const events=[],good=generated();
+  const service=createLessonService({readState:()=>structuredClone(state),writeState:value=>{state=value;},now:()=>new Date('2026-11-03T04:00:00Z'),
+    streamComplete:async(_, {onDelta})=>{
+      round++;
+      if(round===1){onDelta('{"cards":['+JSON.stringify({kind:'insight',title:'戒奶茶',body:'喝奶茶前先暂停',highlight:'少喝糖',steps:[]})+',');throw new Error('should reject first card');}
+      onDelta(good.choices[0].message.content);return good;
+    }
+  });
+  const result=await service.generate('Asia/Shanghai',{onEvent:event=>events.push(event)});
+  assert.equal(result.lesson.origin,'ai');
+  assert.equal(events.filter(event=>event.type==='card').length,5);
+  assert.doesNotMatch(JSON.stringify(events),/奶茶/);
+});
+
+test('cached off-topic lessons regenerate automatically under a new identity without deleting completion records', async () => {
+  const oldBase=fixture().service.get().lesson;
+  const old={...oldBase,origin:'ai',focusVersion:undefined,title:'戒奶茶，给自己一点时间',completedAt:'2026-11-03T01:00:00Z',intention:'少喝奶茶'};
+  const f=fixture({dailyLessons:{[old.id]:old}});
+  const preview=f.service.get();
+  assert.equal(preview.needsGeneration,true);
+  assert.equal(preview.lesson.origin,'starter');
+  assert.doesNotMatch(JSON.stringify(preview),/奶茶/);
+  const result=await f.service.generate();
+  assert.equal(result.lesson.origin,'ai');
+  assert.notEqual(result.lesson.id,old.id);
+  assert.equal(result.needsGeneration,false);
+  assert.deepEqual(f.state().dailyLessons[old.id],old);
+  await createLessonService(f.options).generate();
+  assert.equal(f.calls(),1);
+});
+
+test('a valid old recovery lesson refreshes its content policy while preserving readable history', async () => {
+  const f=fixture();
+  const first=(await f.service.generate()).lesson;
+  const upgrade=fixture({dailyLessons:{[first.id]:{...first,focusVersion:undefined}}});
+  assert.equal(upgrade.service.get().lesson.id,first.id);
+  assert.equal(upgrade.service.get().needsGeneration,true);
+  const result=await upgrade.service.generate();
+  assert.notEqual(result.lesson.id,first.id);
+  assert.equal(result.history[0].id,first.id);
+  assert.equal(result.needsGeneration,false);
+});
+
+test('adding recovery labels to generic cards cannot bypass the lesson focus check', async () => {
+  const draft=JSON.parse(generated().choices[0].message.content);
+  draft.cards=draft.cards.map(card=>({...card,label:'戒色课',body:'照顾感受，选择生活里一个小动作。',annotations:[{text:'色情内容',style:'underline'}]}));
+  const f=fixture({},()=>({choices:[{message:{content:JSON.stringify(draft)}}]}));
+  assert.equal((await f.service.generate()).lesson.origin,'starter');
+  assert.equal(f.state().dailyLessons,undefined);
+});
+
+test('failed refresh of an off-topic cache stays on the recovery starter and retains the old completion', async () => {
+  const old={...fixture().service.get().lesson,origin:'ai',title:'奶茶戒断练习',completedAt:'2026-11-03T01:00:00Z'};
+  const f=fixture({dailyLessons:{[old.id]:old}},()=>{throw new Error('provider unavailable');});
+  const result=await f.service.generate();
+  assert.equal(result.lesson.origin,'starter');
+  assert.equal(result.needsGeneration,true);
+  assert.ok(result.generationError);
+  assert.doesNotMatch(JSON.stringify(result),/奶茶/);
+  assert.equal(f.state().dailyLessons[old.id].completedAt,old.completedAt);
 });
