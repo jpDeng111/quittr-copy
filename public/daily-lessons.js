@@ -290,6 +290,7 @@ function DailyLessonReader({ lesson, daily, onBack, onAction, onReplace }) {
     finished ? h('div', { className: 'reader-completion' }, h('div', { className: 'completion-orbit' }, h(Icon, { name: 'check-circle' })), h('span', { className: 'classroom-wordmark' }, 'A LITTLE WISER, A LITTLE KINDER'), h('h1', null, '今天的你，\n又多懂自己一点。'), h('p', null, '不必急着做到完美。愿这一点理解，陪你走进今天。'),
       h('div', { className: 'completion-takeaway' }, h('span', null, '把这句话带走'), h('blockquote', null, lesson.takeaway), intention && h('div', null, h(Icon, { name: 'check-circle' }), '今天的小行动：', intention)),
       h('button', { className: 'classroom-primary', onClick: onBack }, '收好今天的理解', h('span', null, '↗')),
+      h(CheckinReturnButton, { label: '读完了，去打卡记录今天的领悟 ↗' }),
       h(CommunityShareButton, { content: lessonShareContent(lesson), label: '把这节小课分享给社区 ↗' }),
       h('button', { className: 'reader-text-button', onClick: () => onAction('melius') }, '和 Melius 聊聊我的感受 →')) :
     h(React.Fragment, null,

@@ -122,6 +122,7 @@ function MeliusPlanCard({ action, initialPlan }) {
       h('div', { className: 'plan-sync-buttons' }, native && h('button', { type: 'button', disabled: !!busy, onClick: () => sync('reminders') }, '同步提醒事项 ↗'), h('button', { type: 'button', disabled: !!busy, onClick: () => sync('calendar') }, native ? '同步到日历 ↗' : '导出日历 ↗'), h('button', { type: 'button', disabled: !!busy, onClick: () => sync('notes') }, native ? '保存到备忘录 ↗' : '复制到备忘录')),
       native && h('button', { type: 'button', className: 'plan-read-completed', disabled: !!busy, onClick: readCompleted }, '读取提醒事项中的完成记录 ↻'),
       h('small', null, native ? '首次同步时，iOS 会询问权限。备忘录通过系统分享保存。' : '在 iOS App 中可以直接同步提醒事项与日历。')),
+    summary.complete > 0 && h(CheckinReturnButton, { label: '做完一小步，去打卡记录下来 ↗' }),
     busy && h('p', { className: 'plan-feedback', role: 'status' }, '正在处理…'), notice && h('p', { className: 'plan-feedback', role: 'status' }, notice), error && h('p', { className: 'plan-error', role: 'alert' }, error));
 }
 

@@ -5825,3 +5825,53 @@ button.artifact-item:hover { background: #dce5d04d; }
 .content-report-form { display:flex; gap:8px; margin-top:12px; }
 .content-report-form button { font-size:10px; color:#bbcfaa; background:#35472e; padding:8px; border-radius:6px; }
 @media(max-width:600px){.content-feed-grid{grid-template-columns:1fr}.content-community-heading h1{font-size:30px}.content-community{padding-top:0}.community-publish-overlay{padding:12px}.community-publish-sheet{padding:20px;max-height:calc(100dvh - 24px)}}
+
+/* The daily check-in comes first; cumulative effort survives an interruption. */
+.daily-checkin-panel { position:relative; padding:25px; margin:0 0 25px; border-radius:18px; border:1px solid #b7cf9c40; background:radial-gradient(ellipse at 100% 0,#64864f26,transparent 60%),#172017; scroll-margin-top:20px; }
+.checkin-eyebrow { display:flex; align-items:center; justify-content:space-between; gap:8px; color:#96ab85; font-size:8px; letter-spacing:1.8px; }
+.checkin-eyebrow small { font-size:8px; letter-spacing:.3px; color:#819774; }
+.checkin-heading { display:flex; align-items:center; gap:20px; margin:22px 0; }
+.checkin-heading > div { flex:1; }
+.checkin-heading h1 { color:#e6ecd5; font-family:'Songti SC',Georgia,serif; font-weight:400; font-size:27px; line-height:1.7; margin:0 0 12px; }
+.checkin-heading p { color:#93a684; font-size:11px; line-height:1.9; margin:0; }
+.checkin-orbit { width:60px; height:60px; display:grid; place-items:center; border:1px solid #bcd49f40; border-radius:50%; font-size:30px; color:#c8dcb0; box-shadow:0 0 0 8px #b4cf9206,0 0 0 18px #b4cf9204; }
+.checkin-facts { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:25px 0 20px; }
+.checkin-facts > div { border-left:1px solid #b4cb9426; padding-left:12px; }
+.checkin-facts strong { display:block; font-size:26px; font-family:Georgia,serif; font-weight:400; color:#cedeb6; }
+.checkin-facts strong small { color:#7e966f; font-size:9px; }
+.checkin-facts div > span { display:block; font-size:9px; color:#829775; margin-top:8px; }
+.checkin-week { display:grid; grid-template-columns:repeat(7,1fr); gap:10px; border-top:1px solid #a9bf8a24; padding-top:18px; }
+.checkin-week > div { text-align:center; }
+.checkin-week small { display:block; color:#819672; font-size:9px; margin-bottom:10px; }
+.checkin-week div > span { display:grid; width:28px; height:28px; margin:auto; place-items:center; border:1px solid #b4c99b26; border-radius:50%; color:#6e845f; font-size:18px; }
+.checkin-week .is-checked > span { border-color:#9dbb7d66; color:#dce8c7; background:#809b5d33; font-size:14px; }
+.checkin-energy-history { display:flex; align-items:flex-end; gap:13px; margin:22px 0; font-size:9px; color:#8ca17c; }
+.checkin-energy-history > div { display:flex; align-items:flex-end; gap:6px; height:26px; }
+.checkin-energy-history i { display:block; width:6px; border-radius:3px; background:#5e734c66; }
+.checkin-energy-history i.has-value { background:#abc98c; }
+.checkin-energy-history small { font-size:8px; color:#68805d; margin-left:auto; }
+.checkin-primary { display:block; width:100%; border-radius:8px; padding:13px 16px; text-align:center; background:#d6e2bc; color:#34512c; font-size:12px; }
+.is-checked > .checkin-primary { background:#adc48a14; border:1px solid #a4bd8340; color:#bdcfa7; }
+.checkin-form { margin-top:22px; }
+.checkin-form fieldset { border:0; padding:0; margin:0 0 20px; }
+.checkin-form legend { color:#acbf98; font-size:11px; margin-bottom:12px; }
+.checkin-energy-options { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+.checkin-energy-options button { display:grid; gap:7px; color:#81996e; border:1px solid #a3ba7e26; background:#b5cf9006; border-radius:8px; padding:11px 2px; font-size:9px; }
+.checkin-energy-options strong { font-size:20px; font-family:Georgia,serif; font-weight:400; }
+.checkin-energy-options button[aria-pressed=true],.checkin-moods button[aria-pressed=true] { border-color:#afc88d; background:#91b36722; color:#dbebc8; }
+.checkin-moods { display:flex; flex-wrap:wrap; gap:7px; }
+.checkin-moods button { background:#a4bf8420; border:1px solid transparent; padding:8px 10px; border-radius:7px; color:#9cb78a; font-size:10px; }
+.checkin-form label { display:grid; gap:10px; margin-bottom:18px; color:#a8bd95; font-size:11px; }
+.checkin-form input,.checkin-form textarea { width:100%; background:#0f190f; border:1px solid #b7ca972d; border-radius:7px; padding:12px; color:#d5e6c2; font:inherit; font-size:12px; line-height:1.9; }
+.checkin-private { display:block; margin-top:11px; color:#6f8860; font-size:9px; line-height:1.8; }
+.checkin-saved,.checkin-return-note { font-size:11px; line-height:1.9; color:#bdd8a2; margin:15px 0 0; }
+.checkin-error { color:#d6a78d; font-size:11px; line-height:1.9; }
+.checkin-next-steps { display:flex; align-items:center; flex-wrap:wrap; gap:8px 15px; margin-top:20px; padding-top:17px; border-top:1px solid #b2c88c22; }
+.checkin-next-steps > span { width:100%; font-size:9px; color:#7e986d; }
+.checkin-next-steps > button { background:none; padding:5px 0; color:#adca94; font-size:10px; }
+.checkin-next-steps .community-share-entry { margin-top:0; color:#adca94; border:none; }
+.checkin-return-button { display:block; background:none; border:1px solid #adc58f26; color:#a7bd93; border-radius:7px; padding:10px 12px; margin:12px 0; font-size:10px; line-height:1.8; }
+.reader-completion > .checkin-return-button { margin:15px auto; }
+.melius-plan-card .checkin-return-button { color:#6b8553; border-color:#92a97a55; }
+.daily-checkin-panel button:focus-visible { outline:2px solid #b6ce92; outline-offset:3px; }
+@media(max-width:500px){.daily-checkin-panel{padding:20px 18px}.checkin-heading h1{font-size:23px}.checkin-heading{gap:15px}.checkin-orbit{width:44px;height:44px;font-size:24px}.checkin-energy-history{gap:8px}.checkin-energy-history small{font-size:7px}.checkin-eyebrow small{font-size:7px}.checkin-energy-options button{font-size:8px}.checkin-week{gap:5px}}

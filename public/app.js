@@ -54,7 +54,7 @@ const fallbackStats = [
 ];
 
 const quickActions = [
-  { label: "Pledge Now", icon: "hand", active: true, action: "pledge" },
+  { label: "每日打卡", icon: "hand", active: true, action: "daily checkin" },
   { label: "Melius", icon: "melius", action: "melius" },
   { label: "Urge", icon: "bolt", action: "urge" },
   { label: "Reset", icon: "undo", action: "reset" }
@@ -693,7 +693,14 @@ function App() {
     return data;
   }
 
+  useEffect(() => {
+    const openCheckin = () => { setPage('home'); window.requestAnimationFrame(() => window.dispatchEvent(new CustomEvent('quittr-open-checkin'))); };
+    window.addEventListener('quittr-navigate-checkin',openCheckin);
+    return () => window.removeEventListener('quittr-navigate-checkin',openCheckin);
+  }, []);
+
   async function handleAction(action) {
+    if(action === 'daily checkin') { setPage('home'); window.requestAnimationFrame(() => window.dispatchEvent(new CustomEvent('quittr-open-checkin'))); return; }
     if (action === "pledge") {
       setIsPledgeOpen(true);
       return;
@@ -1132,6 +1139,7 @@ function HomePage({ onAction, journalEntries, analytics, clockNow, daily }) {
   return h(
     React.Fragment,
     null,
+    h(DailyCheckInPanel, { onAction, daily }),
     h("section", { ref: milestonesRef, className: "milestones", "aria-label": "90 day milestones" }, milestoneItems.map((item) => h(Milestone, { key: item.day, item, onAction }))),
     h("section", { className: "stats-grid", "aria-label": "Recovery stats" }, homeStats.map((item) => h(StatCard, { key: item.label, item, onAction }))),
     h("section", { className: "quick-grid", "aria-label": "Quick actions" }, quickActions.map((item) => h(QuickAction, { key: item.action, item, onAction }))),

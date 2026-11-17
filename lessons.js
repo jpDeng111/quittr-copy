@@ -58,12 +58,14 @@ function collectWindow(state, dates, days, limits) {
   const checkIns = (state.recoveryCheckIns || []).filter((entry) => inWindow(entry.occurredAt || entry.loggedAt))
     .sort((a, b) => String(b.occurredAt || b.loggedAt || '').localeCompare(String(a.occurredAt || a.loggedAt || ''))).slice(0, limits.checkIns)
     .map((entry) => ({ at: entry.occurredAt || entry.loggedAt, relapsed: entry.relapsed, feelings: clean(entry.feelings, 200), trigger: clean(entry.trigger, 300), nextStep: clean(entry.nextStep, 300) }));
+  const dailyCheckIns = Object.values(state.dailyCheckIns || {}).filter(entry => inWindow(entry.createdAt)).slice(0, limits.checkIns)
+    .map(entry => ({ at: entry.createdAt, energy: entry.energy, mood: clean(entry.mood,30), action: clean(entry.action,180), note: clean(entry.note,500) }));
   const relapseCount = (state.relapses || []).filter((value) => inWindow(value)).length;
   const completedLessons = Object.values(state.dailyLessons || {}).filter((lesson) => inWindow(lesson.completedAt))
     .sort(newestFirst('completedAt')).slice(0, 3)
     .map((lesson) => ({ title: lesson.title, takeaway: lesson.takeaway, reflection: lesson.reflection || '', intention: lesson.intention || '' }));
-  const total = conversations.length + journals.length + urges.length + checkIns.length + relapseCount + completedLessons.length;
-  return { start, conversations, journals, urges, checkIns, relapseCount, completedLessons, total };
+  const total = conversations.length + journals.length + urges.length + checkIns.length + dailyCheckIns.length + relapseCount + completedLessons.length;
+  return { start, conversations, journals, urges, checkIns, dailyCheckIns, relapseCount, completedLessons, total };
 }
 
 function buildLessonContext(state, dates) {
@@ -90,6 +92,7 @@ function sourceSummary(context) {
     context.conversations.length ? `${prefix}${context.conversations.length} 段 Melius 对话` : '',
     context.journals.length ? `${prefix}${context.journals.length} 条日记` : '',
     context.urges.length ? `${prefix}${context.urges.length} 次冲动记录` : '',
+    context.dailyCheckIns?.length ? `${prefix}${context.dailyCheckIns.length} 次每日打卡` : '',
     context.checkIns.length ? `${prefix}${context.checkIns.length} 次打卡` : '',
     context.relapseCount ? `${prefix}恢复记录` : '',
     context.completedLessons.length ? `${prefix}小课反馈` : ''

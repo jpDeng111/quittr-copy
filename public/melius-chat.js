@@ -81,6 +81,7 @@ function useMeliusConversation(onUpdated) {
         { id: `${id}-reply`, role: "assistant", status: "complete", text: result.reply, actions: result.actions || [], createdAt: new Date().toISOString() }
       ]);
       for (const action of result.actions || []) {
+        if (action.type === 'daily_checkin') window.dispatchEvent(new CustomEvent('quittr-checkin-updated'));
         if (action.type !== 'task_plan') continue;
         announcePlanUpdate(action.plan);
         if (window.webkit?.messageHandlers?.quittrPlanner && action.title === '进度已更新') {
@@ -140,7 +141,7 @@ function ChatActionCard({ action, onAction }) {
     h("span", { className: "chat-action-icon" }, h(Icon, { name: breathing ? "wind" : action.type === "game" ? "brain" : "check-circle" })),
     h("div", null, h("strong", null, breathing ? "深呼吸练习" : action.title), h("p", null, action.detail),
       h("button", { type: "button", onClick: () => onAction(action.type === "game" ? `melius game ${action.gameId}` : action.route) },
-        breathing ? "进入呼吸练习" : action.type === "game" ? "打开游戏" : action.route === "reasons" ? "查看动力" : action.route === "journal" ? "查看日记" : "查看统计", h(Icon, { name: "chevron" }))
+        action.type === "daily_checkin" ? "查看今天的打卡" : breathing ? "进入呼吸练习" : action.type === "game" ? "打开游戏" : action.route === "reasons" ? "查看动力" : action.route === "journal" ? "查看日记" : "查看统计", h(Icon, { name: "chevron" }))
     )
   );
 }
@@ -256,6 +257,7 @@ function MeliusChatPage({ chat, onAction, onBack }) {
       h("button", { type: "button", className: "chat-journal-link", onClick: () => onAction("journal"), "aria-label": "查看日记" }, h(Icon, { name: "journal" }))
     ),
     h(MeliusPlansPanel, { onSuggest: setDraft }),
+    h(CheckinReturnButton, { label: "聊完之后，记录今天的一小步 ↗" }),
     h("div", { className: "chat-thread", "aria-label": "Conversation" },
       chat.olderCursor ? h("button", { type: "button", className: "auth-link", disabled: isSending || chat.loadingOlder, onClick: chat.loadOlder }, chat.loadingOlder ? "正在加载…" : "加载更早的对话") : null,
       chat.historyError ? h("p", { role: "alert", className: "auth-error" }, chat.historyError) : null,

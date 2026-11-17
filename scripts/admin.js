@@ -21,6 +21,13 @@ async function main() {
   }
   const store = createStore(filename);
   try {
+    if (action === 'metrics') {
+      const { productMetrics } = require('../product-metrics');
+      const states = store.db.prepare('SELECT u.id AS user_id,s.data FROM users u LEFT JOIN user_state s ON s.user_id=u.id').all().map(row => ({ userId: row.user_id, state: JSON.parse(row.data || '{}') }));
+      const hasConsumption = store.db.prepare("SELECT 1 FROM sqlite_master WHERE name='community_consumptions'").get();
+      const consumptions = hasConsumption ? store.db.prepare('SELECT user_id,created_at FROM community_consumptions').all() : [];
+      console.log(JSON.stringify(productMetrics(states, { consumptions }), null, 2)); return;
+    }
     if (action === 'users') {
       console.table(store.db.prepare('SELECT email,created_at FROM users ORDER BY created_at').all()); return;
     }
@@ -50,7 +57,7 @@ async function main() {
       }
       return;
     }
-    throw new Error('用法：npm run admin -- users | reset-password <邮箱> | import-legacy <邮箱> <JSON路径>；备份：npm run backup');
+    throw new Error('用法：npm run admin -- metrics | users | reset-password <邮箱> | import-legacy <邮箱> <JSON路径>；备份：npm run backup');
   } finally { store.close(); }
 }
 main().catch(error => { console.error(error.message); process.exitCode = 1; });

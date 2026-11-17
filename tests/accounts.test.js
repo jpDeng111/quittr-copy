@@ -83,7 +83,7 @@ test('HTTP registration, account isolation, chat history, restart and session re
   t.after(async () => { await stop(); fs.rmSync(dir, { recursive: true }); });
   for (const route of ['/mobile.css', '/mobile.js', '/manifest.webmanifest', '/sw.js', '/offline.html', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png']) assert.equal((await request(route)).status, 200);
   assert.equal((await request('/manifest.webmanifest')).data.display, 'standalone');
-  for (const route of ['/api/quittr/journal', '/api/melius/history', '/api/quittr/analytics', '/api/account/export', '/api/blocker/state', '/api/community/posts', '/api/lessons/daily', '/api/plans']) assert.equal((await request(route)).status, 401);
+  for (const route of ['/api/quittr/journal', '/api/melius/history', '/api/quittr/analytics', '/api/account/export', '/api/blocker/state', '/api/community/posts', '/api/lessons/daily', '/api/plans', '/api/checkins']) assert.equal((await request(route)).status, 401);
   assert.equal((await request('/api/auth/register', { body: {}, headers: { Origin: 'https://evil.example' } })).status, 403);
   assert.equal((await request('/api/auth/register', { raw: '{bad' })).status, 400);
   assert.equal((await request('/api/auth/register', { raw: JSON.stringify({ value: 'a'.repeat(150000) }) })).status, 413);
@@ -141,6 +141,10 @@ test('HTTP registration, account isolation, chat history, restart and session re
   await request('/api/community/moderate',{cookie:a.cookie,body:{postId:music.data.post.id,action:'approve'}});
   const range = await request(audioUrl,{cookie:b.cookie,headers:{Range:'bytes=0-2'}});
   assert.equal(range.status,206); assert.equal(range.data,'ID3'); assert.match(range.response.headers.get('content-range'),/^bytes 0-2\//);
+  const checked = await request('/api/checkins',{cookie:a.cookie,body:{timeZone:'Asia/Shanghai',energy:4,mood:'轻松',action:'散步十分钟'}});
+  assert.equal(checked.data.totalDays,1);
+  assert.equal((await request('/api/checkins',{cookie:a.cookie,body:{timeZone:'Asia/Shanghai',energy:3}})).data.totalDays,1);
+  assert.equal((await request('/api/checkins',{cookie:b.cookie})).data.totalDays,0);
   const pledge = { timeZone: 'Asia/Shanghai' };
   await request('/api/quittr/pledges', { cookie: a.cookie, body: pledge });
   assert.equal((await request('/api/quittr/pledges', { cookie: a.cookie, body: pledge })).data.pledges.length, 1);

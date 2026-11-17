@@ -49,7 +49,8 @@ function SharedContentControls({ post, onChange = ()=>{} }) {
     post.audio&&h('audio',{controls:true,preload:'none',src:post.audio.url,'aria-label':post.title,onEnded:()=>act('consume',{kind:'listen'})}),
     h('div',{className:'shared-content-actions'},h('button',{type:'button',disabled:busy,onClick:()=>act('save',{})},post.savedByMe?'已收藏 ✓':'收藏 +'),post.status==='published'&&post.kind==='tutorial'&&h('button',{type:'button',disabled:busy,onClick:()=>act('consume',{kind:'read'})},'我读完了 ✓'),post.isOwner?h('button',{type:'button',disabled:busy||post.status==='withdrawn',onClick:()=>act('withdraw',{})},'撤回分享'):h('button',{type:'button',disabled:busy,onClick:()=>setReportOpen(value=>!value)},'举报')),
     reportOpen&&h('form',{onSubmit:e=>{e.preventDefault();act('report',{reason});},className:'content-report-form'},h('input',{value:reason,required:true,maxLength:500,onChange:e=>setReason(e.target.value),placeholder:'说明问题，例如不当内容、侵权或虚假信息','aria-label':'举报原因'}),h('button',{type:'submit',disabled:busy||!reason.trim()},'提交举报')),
-    message&&h('small',{role:'status',className:'shared-content-message'},message));
+    message&&h('small',{role:'status',className:'shared-content-message'},message),
+    message==='已记录这次学习。'&&h(CheckinReturnButton,{label:'带着这点理解，回去打卡 ↗'}));
 }
 function CommunityReviewItem({ post, onUpdated }) {
   const [note,setNote]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);

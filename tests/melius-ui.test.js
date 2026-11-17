@@ -15,7 +15,7 @@ function uiHarness(overrides = {}) {
     useRef(initial) { const index = refCursor++; if (!(index in refs)) refs[index] = { current: initial }; return refs[index]; },
     useEffect() {},
     h: (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity) }),
-    Icon: () => null, CommunityShareButton: () => null,
+    Icon: () => null, CommunityShareButton: () => null, CheckinReturnButton: () => null,
     getClientErrorMessage: (error) => error.message,
     sendMeliusMessage: overrides.sendMeliusMessage || (async () => ({ reply: "回复成功", actions: [] }))
   });

@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { createMeliusService } = require("./melius");
+const { createCheckinService } = require("./checkins");
 const { createPlanService } = require("./plans");
 const { createLessonService } = require("./lessons");
 const { readCompletionStream } = require("./public/event-stream");
@@ -33,7 +34,7 @@ function requestServices() {
   const context = current();
   if (!context) throw failure(401, "请先登录。");
   if (context.services) return context.services;
-  context.services = { plans: createPlanService({ readState: readQuittrState, writeState: writeQuittrState }), melius: createMeliusService({ readState: readQuittrState, writeState: writeQuittrState, complete: requestMeliusCompletion, streamComplete: (payload, { onDelta }) => requestMeliusCompletion({ ...payload, stream: true }, { onDelta, timeoutMs: 60000 }) }),
+  context.services = { checkins: createCheckinService({ readState: readQuittrState, writeState: writeQuittrState }), plans: createPlanService({ readState: readQuittrState, writeState: writeQuittrState }), melius: createMeliusService({ readState: readQuittrState, writeState: writeQuittrState, complete: requestMeliusCompletion, streamComplete: (payload, { onDelta }) => requestMeliusCompletion({ ...payload, stream: true }, { onDelta, timeoutMs: 60000 }) }),
     lessons: createLessonService({
       readState: readQuittrState, writeState: writeQuittrState,
       complete: payload => requestMeliusCompletion(payload, { model: LESSON_MODEL_NAME, timeoutMs: LESSON_TIMEOUT_MS }),
@@ -44,6 +45,7 @@ function requestServices() {
   return context.services;
 }
 const melius = new Proxy({}, { get: (_, method) => (...args) => requestServices().melius[method](...args) });
+const checkins = new Proxy({}, { get: (_, method) => (...args) => requestServices().checkins[method](...args) });
 const plans = new Proxy({}, { get: (_, method) => (...args) => requestServices().plans[method](...args) });
 const lessons = new Proxy({}, { get: (_, method) => (...args) => requestServices().lessons[method](...args) });
 
@@ -183,6 +185,9 @@ async function handleRequest(req, res) {
       return await handleMeliusChat(req, res);
     }
 
+    if (req.method === "GET" && url.pathname === "/checkins.js") return serveFile(res,path.join(STATIC_DIR,"checkins.js"),"application/javascript; charset=utf-8");
+    if (req.method === "GET" && url.pathname === "/api/checkins") return sendJson(res,200,checkins.get(url.searchParams.get('timeZone')||'Asia/Shanghai'));
+    if (req.method === "POST" && url.pathname === "/api/checkins") return sendJson(res,200,checkins.record(await readJson(req)));
     if (req.method === "GET" && url.pathname === "/api/plans") return sendJson(res, 200, plans.list());
     if (req.method === "GET" && url.pathname.startsWith("/api/plans/")) return sendJson(res, 200, plans.get(url.pathname.slice("/api/plans/".length)));
     if (req.method === "POST" && url.pathname === "/api/plans/progress") return sendJson(res, 200, plans.progress(await readJson(req)));
