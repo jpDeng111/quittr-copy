@@ -28,7 +28,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN ? new URL(process.env.PUBLIC_ORIGIN).origin : "";
 const store = createStore(path.join(DATA_DIR, "quittr.sqlite"));
 const auth = createAuth(store, { secure: PUBLIC_ORIGIN.startsWith("https://"), allowRegistration: process.env.ALLOW_REGISTRATION !== "false" });
-const community = createCommunity(store.db);
+const community = createCommunity(store.db, { moderatorEmails: String(process.env.COMMUNITY_MODERATOR_EMAILS || "").split(",") });
 function requestServices() {
   const context = current();
   if (!context) throw failure(401, "请先登录。");
@@ -61,7 +61,7 @@ const server = http.createServer(async (req, res) => {
       if (req.headers.origin ? req.headers.origin !== expected : req.headers["x-quittr-request"] !== "1") throw failure(403, "请求来源无效，请从应用页面操作。");
       if (req.headers["sec-fetch-site"] === "cross-site") throw failure(403, "请求来源无效。");
       if (!String(req.headers["content-type"] || "").startsWith("application/json")) throw failure(415, "请使用 JSON 请求。");
-      req.jsonBody = await readJson(req);
+      req.jsonBody = await readJson(req, url.pathname === "/api/community/audio" ? 12 * 1024 * 1024 : 128 * 1024);
     }
     const address = req.socket.remoteAddress || "";
     const isLoopback = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(address);
@@ -309,8 +309,24 @@ async function handleRequest(req, res) {
       return sendJson(res, 200, getBlockerScreenTime());
     }
 
+    if (req.method === "GET" && url.pathname === "/content-community.js") return serveFile(res, path.join(STATIC_DIR,"content-community.js"),"application/javascript; charset=utf-8");
+    if (req.method === "GET" && url.pathname === "/api/community/moderation") return sendJson(res,200,community.queue(current().user.id));
+    const communityActions = { save:'save',report:'report',moderate:'moderate',withdraw:'withdraw',consume:'consume',audio:'uploadAudio' };
+    if (req.method === "POST" && communityActions[url.pathname.slice('/api/community/'.length)] && url.pathname.startsWith('/api/community/')) return sendJson(res,200,community[communityActions[url.pathname.slice('/api/community/'.length)]](current().user.id,await readJson(req)));
+    if (req.method === "GET" && url.pathname.startsWith('/api/community/audio/')) {
+      const {mime,bytes}=community.audio(current().user.id,url.pathname.slice('/api/community/audio/'.length));
+      res.setHeader('Content-Type',mime); res.setHeader('Accept-Ranges','bytes');
+      if(req.headers.range) {
+        const match=/^bytes=(\d+)-(\d*)$/.exec(req.headers.range);
+        const start=Number(match?.[1]),end=match?.[2]?Math.min(Number(match[2]),bytes.length-1):bytes.length-1;
+        if(!match||start>end||start>=bytes.length){res.writeHead(416,{'Content-Range':`bytes */${bytes.length}`});res.end();return;}
+        res.writeHead(206,{'Content-Range':`bytes ${start}-${end}/${bytes.length}`,'Content-Length':end-start+1});res.end(bytes.subarray(start,end+1));return;
+      }
+      res.writeHead(200,{'Content-Length':bytes.length});res.end(bytes);return;
+    }
+
     if (req.method === "GET" && url.pathname === "/api/community/posts") {
-      return sendJson(res, 200, community.list(current().user.id, url.searchParams.get("filter")));
+      return sendJson(res, 200, community.list(current().user.id, url.searchParams.get("filter"), { kind: url.searchParams.get("kind"), query: url.searchParams.get("query") }));
     }
 
     if (req.method === "POST" && url.pathname === "/api/community/posts") {
@@ -773,14 +789,14 @@ function setCorsHeaders(res) {
   res.setHeader("Vary", "Origin");
 }
 
-function readJson(req) {
+function readJson(req, maxBytes = 128 * 1024) {
   if (req.jsonBody !== undefined) return Promise.resolve(req.jsonBody);
   return new Promise((resolve, reject) => {
     const chunks = [];
     let bytes = 0;
     req.on("data", (chunk) => {
       bytes += chunk.length;
-      if (bytes > 128 * 1024) { reject(failure(413, "请求内容过大。")); return; }
+      if (bytes > maxBytes) { reject(failure(413, "请求内容过大。")); return; }
       chunks.push(chunk);
     });
     req.on("end", () => {

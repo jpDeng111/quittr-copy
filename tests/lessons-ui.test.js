@@ -12,7 +12,7 @@ function harness() {
     localStorage: { getItem() { return null; }, setItem() {} },
     useState(initial) { const i = cursor++; if (!(i in values)) values[i] = typeof initial === 'function' ? initial() : initial; return [values[i], (next) => { values[i] = typeof next === 'function' ? next(values[i]) : next; }]; },
     useRef(initial) { const i = refCursor++; if (!(i in refs)) refs[i] = { current: initial }; return refs[i]; },
-    useEffect() {}, h: (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity) }), Icon() {}, CourseOverviewPage() {}
+    useEffect() {}, h: (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity) }), Icon() {}, CourseOverviewPage() {}, CommunityShareButton() {}, lessonShareContent() {}
   });
   vm.runInContext(fs.readFileSync(require.resolve('../public/daily-lessons.js'), 'utf8'), ctx);
   const lesson = createLessonService({ readState: () => ({}), writeState() {}, complete() {}, now: () => new Date('2026-11-03T00:00:00Z') }).get().lesson;

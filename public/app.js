@@ -3962,36 +3962,7 @@ function BlockerTier3View({ blockerState, setBlockerState, onAction, showToast }
   );
 }
 
-function CommunityPage({ posts, filter, onAction }) {
-  const [filterOpen, setFilterOpen] = useState(false);
-  return h("div", { className: "community-page community-feed-page" },
-    h("header", { className: "community-header" },
-      h("div", { className: "community-header-left" },
-        h("button", { className: "community-filter-btn", type: "button", onClick: () => setFilterOpen(!filterOpen) },
-          h("span", null, "Filter: ", filter === "top" ? "Top" : "New"),
-          h(Icon, { name: "chevron-down" })
-        ),
-        filterOpen ? h("div", { className: "community-filter-dropdown" },
-          h("button", { className: filter === "new" ? "is-active" : "", type: "button", onClick: () => { onAction("community filter new"); setFilterOpen(false); } }, "New"),
-          h("button", { className: filter === "top" ? "is-active" : "", type: "button", onClick: () => { onAction("community filter top"); setFilterOpen(false); } }, "Top")
-        ) : null
-      ),
-      h("div", { className: "community-header-right" },
-        h("button", { className: "community-icon-btn", type: "button", "aria-label": "Notifications" }, h(Icon, { name: "bell" })),
-        h("button", { className: "community-icon-btn", type: "button", "aria-label": "Search" }, h(Icon, { name: "search" }))
-      )
-    ),
-    h("h1", { className: "community-title" }, "Community"),
-    h("div", { className: "community-post-list" },
-      posts.length === 0
-        ? h("div", { className: "community-empty" }, h("p", null, "No posts yet. Be the first to share."))
-        : posts.map((post) =>
-          h(CommunityPostCard, { key: post.id, post, onAction })
-        )
-    ),
-    h("button", { className: "community-fab", type: "button", "aria-label": "New post", onClick: () => onAction("community new post") }, h(Icon, { name: "plus" }))
-  );
-}
+function CommunityPage({ onAction }) { return h(CommunityHub, { onAction }); }
 
 function CommunityPostCard({ post, onAction }) {
   const [expanded, setExpanded] = useState(false);
@@ -4072,6 +4043,7 @@ function PostDetailPage({ post, onAction, showToast, setPost }) {
       ),
       h("h2", { className: "community-post-title" }, post.title),
       h("p", { className: "community-post-text" }, post.body),
+      h(SharedContentControls, { post, onChange: setPost }),
       h("div", { className: "community-post-stats-bar" },
         h("span", { className: "community-stat" }, h(Icon, { name: "comment" }), String(post.commentCount || 0)),
         h("button", { className: "community-stat community-like-btn" + (liked ? " is-liked" : ""), type: "button", onClick: () => { const next = !liked; setLiked(next); setLikeCount(Math.max(0, likeCount + (next ? 1 : -1))); toggleCommunityLike(post.id).catch(() => { setLiked(!next); setLikeCount(likeCount); }); } }, h(Icon, { name: "heart" }), String(likeCount)),

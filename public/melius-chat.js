@@ -129,6 +129,7 @@ function MeliusArtifactCard({ card, onDiscuss }) {
     h('div', { className: 'artifact-takeaway' }, h('span', { 'aria-hidden': true }, '✧'), h('p', null, card.takeaway)),
     card.kind === 'plan' && h('small', { className: 'artifact-selection', role: 'status' }, selected === null ? '选一件，先试试看。' : `想先试试：${card.items[selected].title}`),
     h('footer', { className: 'artifact-footer' }, h('button', { type: 'button', onClick: () => onDiscuss(card), 'aria-label': `继续聊「${card.title}」` }, '继续聊这个', h('span', { 'aria-hidden': true }, '↗')), h('button', { type: 'button', onClick: copy, 'aria-label': '复制卡片' }, copyState || '复制卡片')),
+    h(CommunityShareButton, { content: { kind: 'tutorial', provenance: 'ai', title: card.title, body: [card.body, ...card.items.map(item => `${item.title}：${item.body}`), card.takeaway].join('\n\n') } }),
     h('span', { className: 'artifact-note' }, 'Melius 为你整理 · 建议卡片')
   );
 }

@@ -63,6 +63,7 @@ test('HTTP registration, account isolation, chat history, restart and session re
   process.env.QUITTR_DATA_DIR = dir;
   process.env.PUBLIC_ORIGIN = '';
   process.env.ALLOW_REGISTRATION = 'true';
+  process.env.COMMUNITY_MODERATOR_EMAILS = 'a@example.com';
   let app, base;
   async function start() {
     delete require.cache[require.resolve('../server')];
@@ -125,6 +126,21 @@ test('HTTP registration, account isolation, chat history, restart and session re
   assert.equal((await request('/api/plans/progress', { cookie: b.cookie, body: { planId: plan.id, taskId: plan.tasks[0].id, progress: 100 } })).status, 404);
   const partial = await request('/api/plans/progress', { cookie: a.cookie, body: { planId: plan.id, taskId: plan.tasks[0].id, progress: 50 } });
   assert.equal(partial.data.plan.tasks[0].progress, 50);
+  const pendingContent = await request('/api/community/posts', { cookie: a.cookie, body: { title: '公开小课', body: '只包含分享内容', kind: 'tutorial', provenance: 'ai', consent: true } });
+  const contentId = pendingContent.data.post.id;
+  assert.equal(pendingContent.data.post.status, 'pending');
+  assert.equal((await request(`/api/community/post?id=${contentId}`, { cookie: b.cookie })).status, 404);
+  assert.equal((await request('/api/community/moderate', { cookie: b.cookie, body: {postId:contentId,action:'approve'} })).status, 403);
+  await request('/api/community/moderate', { cookie: a.cookie, body: {postId:contentId,action:'approve'} });
+  assert.equal((await request(`/api/community/post?id=${contentId}`, { cookie: b.cookie })).status, 200);
+  const audioBytes = Buffer.concat([Buffer.from('ID3'),Buffer.alloc(32)]).toString('base64');
+  const upload = await request('/api/community/audio', { cookie:a.cookie, body:{data:audioBytes,consent:true} });
+  const audioUrl = `/api/community/audio/${upload.data.audioId}`;
+  assert.equal((await request(audioUrl,{cookie:b.cookie})).status,404);
+  const music = await request('/api/community/posts',{cookie:a.cookie,body:{title:'声音',body:'我创作的声音',kind:'audio',audioId:upload.data.audioId,consent:true}});
+  await request('/api/community/moderate',{cookie:a.cookie,body:{postId:music.data.post.id,action:'approve'}});
+  const range = await request(audioUrl,{cookie:b.cookie,headers:{Range:'bytes=0-2'}});
+  assert.equal(range.status,206); assert.equal(range.data,'ID3'); assert.match(range.response.headers.get('content-range'),/^bytes 0-2\//);
   const pledge = { timeZone: 'Asia/Shanghai' };
   await request('/api/quittr/pledges', { cookie: a.cookie, body: pledge });
   assert.equal((await request('/api/quittr/pledges', { cookie: a.cookie, body: pledge })).data.pledges.length, 1);
