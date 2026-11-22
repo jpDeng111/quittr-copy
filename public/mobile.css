@@ -15,7 +15,6 @@ html[data-connection=offline] .connection-notice { display: block; }
   input:not([type=checkbox]):not([type=radio]), textarea, select { font-size: 16px !important; }
   .app-shell { min-height: 100svh; padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 24px); padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right)); }
   .page-shell { padding-top: calc(20px + var(--safe-top)); }
-  .milestones { padding-top: calc(30px + var(--safe-top)); }
   .bottom-nav { height: calc(var(--nav-height) + var(--safe-bottom)); padding: 6px 12px calc(8px + var(--safe-bottom)); background: #0d100ff2; border-top: 1px solid #ffffff0b; -webkit-backdrop-filter: blur(18px); }
   .nav-button { width: 100%; min-width: 44px; height: 56px; gap: 4px; align-content: center; font-size: 23px; border-radius: 12px; }
   .nav-button .nav-label { display: block; font-size: 10px; line-height: 1.2; font-weight: 600; }

@@ -29,24 +29,6 @@ function resolveApiBase() {
   return "";
 }
 
-const milestoneNames = [
-  "Sprout", "Ember", "Kindle", "Pioneer", "Spark", "Momentum", "Anchor", "Clarity", "Shield", "Fortress",
-  "Steady", "Lift", "Resolve", "Guardian", "Focus", "Bright", "Rooted", "Calm", "Brave", "Signal",
-  "Summit", "Northstar", "Balance", "Pulse", "Bloom", "Drift", "Beacon", "Mettle", "Horizon", "Prime"
-];
-
-const milestonePalettes = [
-  ["rgba(132, 231, 181, 0.96)", "rgba(25, 144, 92, 0.82)", "rgba(12, 54, 42, 0.72)", "rgba(76, 245, 160, 0.62)"],
-  ["rgba(250, 184, 80, 0.96)", "rgba(205, 75, 39, 0.84)", "rgba(62, 28, 20, 0.72)", "rgba(255, 177, 74, 0.64)"],
-  ["rgba(224, 96, 164, 0.94)", "rgba(104, 56, 129, 0.84)", "rgba(33, 25, 45, 0.72)", "rgba(255, 112, 191, 0.58)"],
-  ["rgba(77, 181, 235, 0.95)", "rgba(49, 96, 202, 0.82)", "rgba(23, 35, 72, 0.72)", "rgba(86, 201, 255, 0.58)"],
-  ["rgba(132, 255, 67, 0.98)", "rgba(38, 188, 21, 0.9)", "rgba(8, 72, 18, 0.78)", "rgba(126, 255, 84, 0.7)"],
-  ["rgba(177, 119, 255, 0.94)", "rgba(96, 62, 174, 0.84)", "rgba(35, 29, 63, 0.72)", "rgba(184, 121, 255, 0.62)"],
-  ["rgba(255, 215, 80, 0.96)", "rgba(194, 130, 30, 0.84)", "rgba(66, 46, 20, 0.72)", "rgba(255, 220, 92, 0.62)"],
-  ["rgba(99, 225, 213, 0.94)", "rgba(40, 137, 147, 0.84)", "rgba(18, 52, 61, 0.72)", "rgba(92, 240, 225, 0.58)"],
-  ["rgba(238, 241, 232, 0.88)", "rgba(103, 117, 116, 0.78)", "rgba(31, 38, 39, 0.72)", "rgba(230, 255, 246, 0.48)"]
-];
-
 const fallbackStats = [
   { label: "Goal", value: "7d", icon: "diamond" },
   { label: "Streak", value: "3h 55m", icon: "streak" },
@@ -1117,30 +1099,10 @@ function App() {
 
 function HomePage({ onAction, journalEntries, analytics, clockNow, daily }) {
   const homeStats = createHomeStats(analytics, clockNow);
-  const currentMilestoneDay = getCurrentMilestoneDay(analytics);
-  const milestoneItems = createDayMilestones(currentMilestoneDay);
-  const milestonesRef = useRef(null);
-
-  useEffect(() => {
-    const container = milestonesRef.current;
-    const current = container ? container.querySelector(".milestone.is-current") : null;
-    if (!container || !current) return;
-
-    const centerCurrent = () => {
-      const left = current.offsetLeft - container.offsetLeft + current.offsetWidth / 2 - container.clientWidth / 2;
-      container.scrollTo({ left: Math.max(0, left), behavior: "instant" });
-    };
-    centerCurrent();
-    const observer = new ResizeObserver(centerCurrent);
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [currentMilestoneDay]);
-
   return h(
     React.Fragment,
     null,
     h(DailyCheckInPanel, { onAction, daily }),
-    h("section", { ref: milestonesRef, className: "milestones", "aria-label": "90 day milestones" }, milestoneItems.map((item) => h(Milestone, { key: item.day, item, onAction }))),
     h("section", { className: "stats-grid", "aria-label": "Recovery stats" }, homeStats.map((item) => h(StatCard, { key: item.label, item, onAction }))),
     h("section", { className: "quick-grid", "aria-label": "Quick actions" }, quickActions.map((item) => h(QuickAction, { key: item.action, item, onAction }))),
     h(ProgressPill, { onAction }),
@@ -2551,26 +2513,6 @@ function BottomNav({ page, onNavigate }) {
   ));
 }
 
-function Milestone({ item, onAction }) {
-  const stateClass = item.current ? "is-current" : item.complete ? "is-complete" : "is-locked";
-  const className = `milestone day-badge ${stateClass}`;
-
-  return h(
-    "button",
-    {
-      className,
-      type: "button",
-      onClick: () => onAction(`day ${item.day}`),
-      "aria-label": `${item.name}, day ${item.day}${item.current ? ", current" : item.complete ? ", complete" : ", locked"}`
-    },
-    h("span", { className: "planet", style: item.style, "aria-hidden": "true" },
-      h("span", { className: "planet-fx" })
-    ),
-    h("strong", null, item.name),
-    h("small", null, item.days)
-  );
-}
-
 function StatCard({ item, onAction }) {
   return h("button", { className: "stat-card", type: "button", onClick: () => onAction(item.label.toLowerCase()) }, h("span", { className: `stat-icon ${item.icon}` }, h(Icon, { name: item.icon })), h("span", { className: "stat-label" }, item.label), h("strong", null, item.value));
 }
@@ -3035,46 +2977,6 @@ function normalizeChartPoints(points, width, height) {
     x: 20 + (index / Math.max(1, items.length - 1)) * (width - 40),
     y: 172 - ((Number(item.days) || 0) / max) * (height - 42)
   }));
-}
-
-function createDayMilestones(currentDay) {
-  return Array.from({ length: 90 }, (_, index) => {
-    const day = index + 1;
-    const palette = milestonePalettes[index % milestonePalettes.length];
-    const phase = Math.floor(index / 10);
-
-    return {
-      day,
-      name: getMilestoneName(day),
-      days: `Day ${day}`,
-      complete: day <= currentDay,
-      current: day === currentDay,
-      style: {
-        "--base-a": palette[0],
-        "--base-b": palette[1],
-        "--base-c": palette[2],
-        "--planet-glow": palette[3],
-        "--planet-ring": phase % 2 === 0 ? "rgba(255, 255, 255, 0.18)" : "rgba(255, 255, 255, 0.08)",
-        "--planet-tilt": `${(day * 23) % 360}deg`
-      }
-    };
-  });
-}
-
-function getCurrentMilestoneDay(analytics) {
-  if (!analytics) {
-    return 0;
-  }
-
-  const days = Number(analytics.currentStreakDays);
-  if (!Number.isFinite(days) || days <= 0) {
-    return 0;
-  }
-  return Math.min(90, Math.max(1, Math.floor(days)));
-}
-
-function getMilestoneName(day) {
-  return milestoneNames[(day - 1) % milestoneNames.length];
 }
 
 function createCalendarMonthCells(monthDate) {

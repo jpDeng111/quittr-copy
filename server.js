@@ -141,6 +141,8 @@ async function handleRequest(req, res) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const mobileAssets = {
       '/mobile.css': ['mobile.css', 'text/css; charset=utf-8'],
+      '/growth-garden.css': ['growth-garden.css', 'text/css; charset=utf-8'],
+      '/growth-garden.js': ['growth-garden.js', 'application/javascript; charset=utf-8'],
       '/mobile-auth.css': ['mobile-auth.css', 'text/css; charset=utf-8'],
       '/mobile.js': ['mobile.js', 'application/javascript; charset=utf-8'],
       '/sw.js': ['sw.js', 'application/javascript; charset=utf-8'],

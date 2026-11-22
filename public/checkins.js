@@ -9,7 +9,9 @@ function DailyCheckInPanel({onAction,daily}){
     window.addEventListener('quittr-checkin-updated',updated);window.addEventListener('quittr-open-checkin',reveal);return()=>{active=false;window.clearInterval(timer);window.removeEventListener('quittr-checkin-updated',updated);window.removeEventListener('quittr-open-checkin',reveal);};},[timeZone]);
   async function submit(event){event.preventDefault();if(busyRef.current)return;busyRef.current=true;setBusy(true);setError('');try{const result=await accountRequest('/api/checkins',{timeZone,energy,mood,action,note});setData(result);setSaved(true);setOpen(false);window.dispatchEvent(new CustomEvent('quittr-checkin-updated'));}catch(err){setError(err.message);}finally{busyRef.current=false;setBusy(false);}}
   const checked=!!data?.entry;
-  return h('section',{ref:panelRef,className:`daily-checkin-panel${checked?' is-checked':''}`,'aria-label':'每日打卡'},
+  return h(React.Fragment, null,
+    h(GrowthGarden, { totalDays: data?.totalDays, accountId: window.QUITTR_ACCOUNT?.user?.id }),
+    h('section',{ref:panelRef,className:`daily-checkin-panel${checked?' is-checked':''}`,'aria-label':'每日打卡'},
     h('div',{className:'checkin-eyebrow'},h('span',null,'YOUR DAILY MOMENT'),h('small',null,data?`${data.today.slice(5).replace('-',' / ')} · ${data.timeZone}`:'正在加载今天的记录…')),
     h('div',{className:'checkin-heading'},h('div',null,h('h1',null,checked?'今天，也好好照顾了自己。':'今天，给自己一个小小的回应。'),h('p',null,checked?'来过、觉察过、尝试过，这些都算数。':'不必等到状态完美。用30秒，记住今天的你。')),h('span',{className:'checkin-orbit','aria-hidden':true},checked?'✓':'✧')),
     h('div',{className:'checkin-facts'},[['累计打卡',data?.totalDays||0],['最近7天',data?.weekCount||0],['连续回应',data?.currentStreak||0]].map(([label,value])=>h('div',{key:label},h('strong',null,value,h('small',null,' 天')),h('span',null,label)))),
@@ -24,6 +26,6 @@ function DailyCheckInPanel({onAction,daily}){
       h('button',{className:'checkin-primary',type:'submit',disabled:busy},busy?'正在收好…':'收好今天的回应 ✓'),h('small',{className:'checkin-private'},'打卡只记录今天的回应，不会自动标记未破戒，也不会重置恢复统计。')),
     error&&h('p',{role:'alert',className:'checkin-error'},error),saved&&h('p',{role:'status',className:'checkin-saved'},'今天的打卡已保存。你的每一小步，都值得被看见。'),
     checked&&h('div',{className:'checkin-next-steps'},h('span',null,'打卡之后，选一件就好'),h('button',{type:'button',onClick:()=>onAction('lessons')},daily?.lesson?.completedAt?'回顾今天的小课 ↗':'读一节为我准备的小课 ↗'),h('button',{type:'button',onClick:()=>onAction('melius')},'让 Melius 陪我整理一下 ↗'),
-      data.entry.action&&h(CommunityShareButton,{content:{kind:'experience',provenance:'personal',title:'今天的一小步',body:data.entry.action},label:'只分享这件小事 ↗'})));
+      data.entry.action&&h(CommunityShareButton,{content:{kind:'experience',provenance:'personal',title:'今天的一小步',body:data.entry.action},label:'只分享这件小事 ↗'}))));
 }
 function CheckinReturnButton({label='回到首页，记录今天的一小步 ↗'}){return h('button',{className:'checkin-return-button',type:'button',onClick:()=>window.dispatchEvent(new CustomEvent('quittr-navigate-checkin'))},label);}
