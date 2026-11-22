@@ -30,24 +30,23 @@ function resolveApiBase() {
 }
 
 const fallbackStats = [
-  { label: "Goal", value: "7d", icon: "diamond" },
-  { label: "Streak", value: "3h 55m", icon: "streak" },
-  { label: "Til Sober", value: "90d", icon: "bars" }
+  { label: "Goal", value: "—" },
+  { label: "Streak", value: "—" },
+  { label: "Til Sober", value: "—" }
 ];
 
 const quickActions = [
-  { label: "每日打卡", icon: "hand", active: true, action: "daily checkin" },
-  { label: "Melius", icon: "melius", action: "melius" },
-  { label: "Urge", icon: "bolt", action: "urge" },
-  { label: "Reset", icon: "undo", action: "reset" }
+  { label: "记录冲动", icon: "bolt", action: "urge" },
+  { label: "和 Melius 聊聊", icon: "melius", action: "melius" },
+  { label: "破戒后复盘", icon: "undo", action: "reset" }
 ];
 
 const cards = [
-  { title: "Rewire by Quittr", subtitle: "1:1 Help from Professionals", icon: "brain", accent: "green", action: "rewire" },
-  { title: "Journal", subtitle: "Take a moment to reflect on your journey.", heading: "How are you feeling?", icon: "journal", badge: "1", buttonLabel: "New Entry", accent: "plain", action: "journal" },
-  { title: "Reasons For Quitting", subtitle: "Click here to add a reason why you're quitting", icon: "note", accent: "plain", action: "reasons" },
-  { title: "Content Blocker", subtitle: "Tap to learn more", icon: "block", accent: "red", pill: "Upgrade", action: "blocker" },
-  { title: "Therapy", subtitle: "Get support from a licensed therapist via BetterHelp.", icon: "therapy", accent: "violet", action: "therapy" }
+  { title: "一对一支持", subtitle: "了解专业支持选项", icon: "brain", accent: "green", action: "rewire" },
+  { title: "私人日记", subtitle: "记下今天的感受或触发点。", icon: "journal", badge: "1", buttonLabel: "写一条", accent: "plain", action: "journal" },
+  { title: "我的改变理由", subtitle: "记下这件事为什么对你重要。", icon: "note", accent: "plain", action: "reasons" },
+  { title: "内容屏蔽", subtitle: "查看可用的屏蔽方式。", icon: "block", accent: "red", action: "blocker" },
+  { title: "心理咨询", subtitle: "了解 BetterHelp 的咨询服务。", icon: "therapy", accent: "violet", action: "therapy" }
 ];
 
 const pledgeBenefits = [
@@ -625,6 +624,7 @@ function App() {
   const [activeDailyLesson, setActiveDailyLesson] = useState(null);
   const [activeGame, setActiveGame] = useState(null);
   const [panicOpen, setPanicOpen] = useState(false);
+  const panicTrigger = useRef(null);
   const [gameFromPanic, setGameFromPanic] = useState(false);
   const [gameReturnPage, setGameReturnPage] = useState("library");
   const chat = useMeliusConversation(async (actions) => {
@@ -681,7 +681,7 @@ function App() {
     return () => window.removeEventListener('quittr-navigate-checkin',openCheckin);
   }, []);
 
-  async function handleAction(action) {
+  async function handleAction(action, trigger) {
     if(action === 'daily checkin') { setPage('home'); window.requestAnimationFrame(() => window.dispatchEvent(new CustomEvent('quittr-open-checkin'))); return; }
     if (action === "pledge") {
       setIsPledgeOpen(true);
@@ -771,11 +771,13 @@ function App() {
       return;
     }
     if (action === "panic") {
+      panicTrigger.current = trigger;
       setPanicOpen(true);
       return;
     }
     if (action === "panic close") {
       setPanicOpen(false);
+      window.requestAnimationFrame(() => panicTrigger.current?.focus());
       return;
     }
     if (action === "panic games") {
@@ -792,6 +794,7 @@ function App() {
       return;
     }
     if (action === "urge") {
+      setPanicOpen(false);
       setPage("urge");
       setUrgeFlow(createUrgeFlow());
       return;
@@ -1099,17 +1102,47 @@ function App() {
 
 function HomePage({ onAction, journalEntries, analytics, clockNow, daily }) {
   const homeStats = createHomeStats(analytics, clockNow);
+  const date = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(clockNow);
+
   return h(
-    React.Fragment,
-    null,
+    "div", { className: "home-notebook" },
+    h("header", { className: "home-masthead" },
+      h("div", null,
+        h("p", { className: "home-date" }, date),
+        h("h1", null, "成长手记")
+      ),
+      h("button", { className: "home-urge-help", type: "button", onClick: (event) => onAction("panic", event.currentTarget) },
+        h(Icon, { name: "bolt" }), "冲动求助"
+      )
+    ),
     h(DailyCheckInPanel, { onAction, daily }),
-    h("section", { className: "stats-grid", "aria-label": "Recovery stats" }, homeStats.map((item) => h(StatCard, { key: item.label, item, onAction }))),
-    h("section", { className: "quick-grid", "aria-label": "Quick actions" }, quickActions.map((item) => h(QuickAction, { key: item.action, item, onAction }))),
-    h(ProgressPill, { onAction }),
-    h(DailyLessonTeaser, { daily, onAction, compact: true }),
-    h("section", { className: "card-stack", "aria-label": "Support tools" }, cards.map((card) => h(FeatureCard, { key: card.action, card, onAction, journalEntries }))),
-    h(QuoteBlock),
-    h("button", { className: "panic-button", type: "button", onClick: () => onAction("panic") }, h(Icon, { name: "warning" }), h("span", null, "Panic Button"))
+    h("div", { className: "home-shelf" },
+      h("section", { className: "home-learning", "aria-label": "今日练习" },
+        h("h2", null, "今日练习"),
+        h(DailyLessonTeaser, { daily, onAction, compact: true })
+      ),
+      h("section", { className: "home-actions", "aria-label": "快捷工具" },
+        h("h2", null, "快捷工具"),
+        h("div", { className: "quick-grid" },
+          quickActions.map((item) => h(QuickAction, { key: item.action, item, onAction }))
+        )
+      )
+    ),
+    h("section", { className: "home-records", "aria-label": "恢复记录" },
+      h("h2", null, "恢复记录"),
+      h("div", { className: "stats-grid" },
+        homeStats.map((item) => h(StatCard, { key: item.label, item, onAction }))
+      ),
+      h("button", { className: "home-habits-link", type: "button", onClick: () => onAction("brain rewiring") },
+        h(Icon, { name: "brain" }), "了解习惯变化", h(Icon, { name: "chevron" })
+      )
+    ),
+    h("section", { className: "home-tools", "aria-label": "更多支持" },
+      h("h2", null, "更多支持"),
+      h("div", { className: "card-stack" },
+        cards.map((card) => h(FeatureCard, { key: card.action, card, onAction, journalEntries }))
+      )
+    )
   );
 }
 
@@ -1489,18 +1522,21 @@ function StreakCalendarDay({ cell, data, today }) {
 }
 
 function AnalyticsPage({ analytics, activeTab, onTab, onAction }) {
-  const data = analytics || createFallbackAnalytics();
+  const labels = { overview: "总览", stats: "统计", urges: "冲动" };
+  const overview = analytics
+    ? h(OverviewPanel, { data: analytics, onAction })
+    : h("p", { className: "coming-soon", role: "status" }, "正在读取恢复记录…");
 
   return h(
     "section",
     { className: "analytics-page" },
-    h("h1", null, "Analytics"),
-    h("div", { className: "analytics-tabs", role: "tablist" }, ["overview", "stats", "urges"].map((tab) =>
-      h("button", { key: tab, className: activeTab === tab ? "analytics-tab is-active" : "analytics-tab", type: "button", onClick: () => onTab(tab) }, titleCase(tab))
+    h("h1", null, "恢复记录"),
+    h("div", { className: "analytics-tabs", "aria-label": "恢复记录分类" }, Object.entries(labels).map(([tab, label]) =>
+      h("button", { key: tab, className: activeTab === tab ? "analytics-tab is-active" : "analytics-tab", type: "button", "aria-pressed": activeTab === tab, onClick: () => onTab(tab) }, label)
     )),
     activeTab === "overview"
-      ? h(OverviewPanel, { data, onAction })
-      : h("section", { className: "coming-soon" }, h("h2", null, titleCase(activeTab)), h("p", null, "This section is ready for the next feature pass."))
+      ? overview
+      : h("section", { className: "coming-soon" }, h("h2", null, labels[activeTab]), h("p", null, "此处暂时没有可查看的记录。"))
   );
 }
 
@@ -1508,35 +1544,19 @@ function OverviewPanel({ data, onAction }) {
   return h(
     React.Fragment,
     null,
-    h(DaysCleanRing, { data }),
+    h("section", { className: "analytics-current", "aria-label": "当前坚持" },
+      h("span", null, "当前坚持"),
+      h("strong", null, data.currentStreakLabel)
+    ),
     h("button", { className: "melius-card", type: "button", onClick: () => onAction("melius") },
       h("span", { className: "melius-icon" }, h(Icon, { name: "melius" })),
-      h("span", { className: "melius-copy" }, h("strong", null, "Talk to Melius"), h("small", null, "Your AI therapist")),
+      h("span", { className: "melius-copy" }, h("strong", null, "和 Melius 聊聊"), h("small", null, "梳理触发点与下一步")),
       h("span", { className: "chevron" }, h(Icon, { name: "chevron" }))
     ),
     h(ProgressChart, { points: data.progressPoints }),
     h(StreakJourney, { streaks: data.streaks }),
     h(AnalyticsStats, { stats: data.stats }),
     h("section", { className: "encouragement" }, h("h2", null, data.encouragement.title), h("p", null, data.encouragement.body))
-  );
-}
-
-function DaysCleanRing({ data }) {
-  const days = Number(data.currentStreakDays) || 0;
-  const progress = Math.min(0.82, Math.max(0.08, days / 30));
-  const circumference = 2 * Math.PI * 84;
-
-  return h(
-    "section",
-    { className: "days-ring" },
-    h("svg", { viewBox: "0 0 220 220", "aria-hidden": "true" },
-      h("circle", { className: "ring-track", cx: "110", cy: "110", r: "84" }),
-      h("circle", { className: "ring-progress", cx: "110", cy: "110", r: "84", strokeDasharray: `${circumference}`, strokeDashoffset: `${circumference * (1 - progress)}` }),
-      h("circle", { className: "ring-dot", cx: "126", cy: "188", r: "11" }),
-      h("path", { className: "ring-check", d: "m120 187 5 5 10-12" })
-    ),
-    h("div", { className: "days-ring-copy" }, h("span", null, "Days Clean"), h("strong", null, data.currentStreakLabel), h("small", null, "Apprentice")),
-    h("span", { className: "breakthrough" }, "Breakthrough")
   );
 }
 
@@ -1547,14 +1567,13 @@ function ProgressChart({ points }) {
   return h(
     "section",
     { className: "chart-section" },
-    h("h2", null, "Progress"),
-    h("div", { className: "legend" }, h("span", { className: "relapse-key" }, "Relapse"), h("span", { className: "progress-key" }, "Progress")),
-    h("svg", { className: "progress-chart", viewBox: "0 0 380 190", role: "img", "aria-label": "Progress chart" },
+    h("h2", null, "恢复趋势"),
+    h("div", { className: "legend" }, h("span", { className: "relapse-key" }, "破戒记录"), h("span", { className: "progress-key" }, "坚持时间")),
+    h("svg", { className: "progress-chart", viewBox: "0 0 380 190", role: "img", "aria-label": "恢复趋势图" },
       [70, 130, 190, 250, 310].map((x) => h("line", { key: x, className: "chart-grid", x1: x, x2: x, y1: "15", y2: "172" })),
       h("path", { className: "chart-fill", d: `${progressPath} L 360 175 L 20 175 Z` }),
       h("path", { className: "progress-line", d: progressPath }),
-      normalized.filter((point) => point.type === "relapse").map((point) => h("circle", { key: point.id, className: "relapse-point", cx: point.x, cy: point.y, r: "7" })),
-      h("path", { className: "chart-arrow", d: "M 344 86 L 360 80 L 356 96" })
+      normalized.filter((point) => point.type === "relapse").map((point) => h("circle", { key: point.id, className: "relapse-point", cx: point.x, cy: point.y, r: "7" }))
     )
   );
 }
@@ -1566,8 +1585,8 @@ function StreakJourney({ streaks }) {
   return h(
     "section",
     { className: "journey-section" },
-    h("div", { className: "journey-heading" }, h("span", null, h("h2", null, "Streak Journey"), h("small", null, `${streaks.length} streaks tracked`)), h(Icon, { name: "chevron" })),
-    h("div", { className: "legend" }, h("span", { className: "streak-key" }, "Streak"), h("span", { className: "relapse-key" }, "Reset")),
+    h("div", { className: "journey-heading" }, h("span", null, h("h2", null, "历次坚持"), h("small", null, `共 ${streaks.length} 段记录`)), h(Icon, { name: "chevron" })),
+    h("div", { className: "legend" }, h("span", { className: "streak-key" }, "坚持时间"), h("span", { className: "relapse-key" }, "破戒记录")),
     h("div", { className: "journey-chart" }, visible.map((item) =>
       h("span", { key: item.id, className: "journey-bar-wrap" },
         h("i", { className: item.relapseAt ? "reset-dot" : "reset-dot is-current" }),
@@ -1603,9 +1622,9 @@ function LibraryPage({ courseChapters, onAction, daily }) {
   return h(
     "section",
     { className: "library-page" },
-    h("h1", null, "Library"),
-    h("section", { className: "library-shortcuts", "aria-label": "Library shortcuts" }, libraryShortcuts.map((item) => h(LibraryShortcut, { key: item.label, item, onAction }))),
+    h("h1", null, "练习与资源"),
     h(DailyLessonTeaser, { daily, onAction }),
+    h("section", { className: "library-shortcuts", "aria-label": "资源入口" }, libraryShortcuts.map((item) => h(LibraryShortcut, { key: item.label, item, onAction }))),
     h(LibraryHeader, { title: "Soundscapes", subtitle: "Relax & drift into a different world to help mitigate urges", action: "soundscapes", onAction }),
     h("section", { className: "soundscape-list", "aria-label": "Soundscapes" }, soundscapes.map((item) => h(SoundscapeButton, { key: item.title, item, onAction }))),
     h("button", { className: "mountain-card", type: "button", onClick: () => onAction("progress mountain") },
@@ -1880,37 +1899,32 @@ function shuffleArray(input) {
 }
 
 function PanicSheet({ onAction }) {
-  const sideEffects = [
-    { icon: "bars", tone: "red", title: "Reduced Performance", body: "Not feeling physically responsive" },
-    { icon: "search", tone: "orange", title: "Desensitization", body: "Needing more extreme content for arousal." },
-    { icon: "heart", tone: "pink", title: "Relationship Issues", body: "Decreased intimacy and trust." },
-    { icon: "people", tone: "blue", title: "Social Isolation", body: "Withdrawal from social interactions." },
-    { icon: "brain", tone: "purple", title: "Distorted Perceptions of Sex", body: "Unrealistic expectations in relationships." }
-  ];
-  return h(
-    "div",
-    { className: "panic-overlay" },
-    h(
-      "div",
-      { className: "panic-sheet", role: "dialog", "aria-label": "Panic Button" },
-      h("button", { className: "icon-button panic-close", type: "button", onClick: () => onAction("panic close"), "aria-label": "Close panic sheet" }, h(Icon, { name: "close" })),
-      h("p", { className: "panic-brand" }, "QUITTR"),
-      h("h1", { className: "panic-title" }, "Panic Button"),
-      h("div", { className: "panic-orb-wrap" },
-        h("div", { className: "panic-orb" }),
-        h("span", { className: "panic-worth" }, "YOU'RE WORTH IT")
-      ),
-      h("div", { className: "panic-divider" }, h("span", null, "Side Effects of Relapsing")),
-      h("div", { className: "panic-effects" }, sideEffects.map((item) =>
-        h("div", { key: item.title, className: `panic-effect tone-${item.tone}` },
-          h("span", { className: "panic-effect-icon" }, h(Icon, { name: item.icon })),
-          h("div", { className: "panic-effect-copy" }, h("strong", null, item.title), h("small", null, item.body))
-        )
-      ))
+  const dialog = useRef(null);
+  useEffect(() => {
+    const sheet = dialog.current;
+    sheet.showModal();
+    return () => sheet.close();
+  }, []);
+
+  return h("dialog", {
+    ref: dialog,
+    className: "panic-sheet",
+    "aria-labelledby": "urge-help-title",
+    "aria-describedby": "urge-help-step",
+    onCancel: (event) => {
+      event.preventDefault();
+      onAction("panic close");
+    }
+  },
+    h("button", { className: "panic-close", type: "button", onClick: () => onAction("panic close"), "aria-label": "关闭求助" },
+      h(Icon, { name: "close" })
     ),
+    h("h2", { id: "urge-help-title" }, "先暂停一下"),
+    h("p", { id: "urge-help-step" }, "先把手从屏幕上移开。条件允许的话，起身换个位置，再选下面一项。"),
     h("div", { className: "panic-actions" },
-      h("button", { className: "panic-relapsing", type: "button", onClick: () => onAction("panic games") }, h(Icon, { name: "warning" }), "I'm thinking of relapsing"),
-      h("button", { className: "panic-relapsed", type: "button", onClick: () => onAction("panic relapsed") }, "I Relapsed")
+      h("button", { className: "panic-primary", type: "button", onClick: () => onAction("urge") }, "梳理此刻的冲动"),
+      h("button", { type: "button", onClick: () => onAction("panic games") }, "用小游戏转移注意"),
+      h("button", { type: "button", onClick: () => onAction("panic relapsed") }, "已经发生了，做一次复盘")
     )
   );
 }
@@ -2501,28 +2515,38 @@ function AchievementBadge({ item, onAction }) {
 
 function BottomNav({ page, onNavigate }) {
   const navItems = [
-    { label: "Home", icon: "home", page: "home" },
-    { label: "Community", icon: "chat", page: "community" },
-    { label: "Stats", icon: "stats", page: "analytics" },
-    { label: "Library", icon: "folder", page: "library" },
-    { label: "Profile", icon: "profile", page: "profile" }
+    { label: "手记", icon: "home", page: "home" },
+    { label: "社区", icon: "chat", page: "community" },
+    { label: "记录", icon: "stats", page: "analytics" },
+    { label: "练习", icon: "folder", page: "library" },
+    { label: "我的", icon: "profile", page: "profile" }
   ];
 
-  return h("nav", { className: "bottom-nav", "aria-label": "Main navigation" }, navItems.map((item) =>
-    h("button", { key: item.label, className: page === item.page ? "nav-button is-active" : "nav-button", type: "button", "aria-label": item.label, 'aria-current': page === item.page ? 'page' : undefined, onClick: () => onNavigate(item.page) }, h(Icon, { name: item.icon }), h('span', { className: 'nav-label' }, ({ Home: '首页', Community: '社区', Stats: '统计', Library: '资源', Profile: '我的' })[item.label]))
-  ));
+  return h("nav", { className: "bottom-nav", "aria-label": "主导航" },
+    navItems.map((item) => h("button", {
+      key: item.page,
+      className: page === item.page ? "nav-button is-active" : "nav-button",
+      type: "button",
+      "aria-label": item.label,
+      "aria-current": page === item.page ? "page" : undefined,
+      onClick: () => onNavigate(item.page)
+    }, h(Icon, { name: item.icon }), h("span", { className: "nav-label" }, item.label)))
+  );
 }
 
 function StatCard({ item, onAction }) {
-  return h("button", { className: "stat-card", type: "button", onClick: () => onAction(item.label.toLowerCase()) }, h("span", { className: `stat-icon ${item.icon}` }, h(Icon, { name: item.icon })), h("span", { className: "stat-label" }, item.label), h("strong", null, item.value));
+  const label = { Goal: "阶段目标", Streak: "当前坚持", "Til Sober": "距离目标" }[item.label] || item.label;
+  return h("button", { className: "stat-card", type: "button", onClick: () => onAction(item.label.toLowerCase()) },
+    h("span", { className: "stat-label" }, label), h("strong", null, item.value)
+  );
 }
 
 function QuickAction({ item, onAction }) {
-  return h("button", { className: item.active ? "quick-action is-active" : "quick-action", type: "button", onClick: () => onAction(item.action) }, h("span", { className: "quick-orb" }, h(Icon, { name: item.icon })), h("span", { className: "quick-label" }, item.label));
-}
-
-function ProgressPill({ onAction }) {
-  return h("button", { className: "progress-pill", type: "button", onClick: () => onAction("brain rewiring") }, h("span", null, "Brain Rewiring"), h("span", { className: "progress-track" }, h("span", { className: "progress-bar" })), h("strong", null, "0%"));
+  return h("button", { className: "quick-action", type: "button", onClick: () => onAction(item.action) },
+    h("span", { className: "quick-orb" }, h(Icon, { name: item.icon })),
+    h("span", { className: "quick-label" }, item.label),
+    h(Icon, { name: "chevron" })
+  );
 }
 
 function FeatureCard({ card, onAction, journalEntries = [] }) {
@@ -2536,18 +2560,13 @@ function FeatureCard({ card, onAction, journalEntries = [] }) {
     h("button", { className: "feature-main", type: "button", onClick: () => onAction(card.action) },
       h("span", { className: `feature-icon ${card.accent}` }, h(Icon, { name: card.icon })),
       h("span", { className: "feature-copy" },
-        h("span", { className: "feature-title-row" }, h("strong", null, card.title), card.pill ? h("em", null, card.pill) : null),
-        card.heading ? h("b", null, latestEntry ? "Today's Reflection" : card.heading) : null,
-        latestEntry ? h("span", { className: "journal-preview" }, h("strong", null, latestEntry.title), h("small", null, latestEntry.body || "No details yet")) : h("small", null, card.subtitle)
+        h("span", { className: "feature-title-row" }, h("strong", null, card.title)),
+        latestEntry ? h("span", { className: "journal-preview" }, h("strong", null, latestEntry.title), h("small", null, latestEntry.body || "暂无正文")) : h("small", null, card.subtitle)
       ),
       card.badge ? h("span", { className: "badge" }, isJournal ? entryCount : card.badge) : h("span", { className: "chevron" }, h(Icon, { name: "chevron" }))
     ),
     card.buttonLabel ? h("button", { className: "entry-button", type: "button", onClick: () => onAction("new entry") }, h(Icon, { name: "edit" }), h("span", null, card.buttonLabel)) : null
   );
-}
-
-function QuoteBlock() {
-  return h("section", { className: "quote-block" }, h("span", { className: "quote-mark" }, "\""), h("p", null, "Today marks the beginning of a powerful journey. This decision is a commitment to a better you. Remember, small steps lead to great changes."), h("span", { className: "quote-mark closing" }, "\""));
 }
 
 function PledgeModal({ onClose, onAction }) {

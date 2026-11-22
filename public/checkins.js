@@ -9,23 +9,24 @@ function DailyCheckInPanel({onAction,daily}){
     window.addEventListener('quittr-checkin-updated',updated);window.addEventListener('quittr-open-checkin',reveal);return()=>{active=false;window.clearInterval(timer);window.removeEventListener('quittr-checkin-updated',updated);window.removeEventListener('quittr-open-checkin',reveal);};},[timeZone]);
   async function submit(event){event.preventDefault();if(busyRef.current)return;busyRef.current=true;setBusy(true);setError('');try{const result=await accountRequest('/api/checkins',{timeZone,energy,mood,action,note});setData(result);setSaved(true);setOpen(false);window.dispatchEvent(new CustomEvent('quittr-checkin-updated'));}catch(err){setError(err.message);}finally{busyRef.current=false;setBusy(false);}}
   const checked=!!data?.entry;
-  return h(React.Fragment, null,
-    h(GrowthGarden, { totalDays: data?.totalDays, accountId: window.QUITTR_ACCOUNT?.user?.id }),
+  return h('div', { className: 'home-practice' },
     h('section',{ref:panelRef,className:`daily-checkin-panel${checked?' is-checked':''}`,'aria-label':'每日打卡'},
-    h('div',{className:'checkin-eyebrow'},h('span',null,'YOUR DAILY MOMENT'),h('small',null,data?`${data.today.slice(5).replace('-',' / ')} · ${data.timeZone}`:'正在加载今天的记录…')),
-    h('div',{className:'checkin-heading'},h('div',null,h('h1',null,checked?'今天，也好好照顾了自己。':'今天，给自己一个小小的回应。'),h('p',null,checked?'来过、觉察过、尝试过，这些都算数。':'不必等到状态完美。用30秒，记住今天的你。')),h('span',{className:'checkin-orbit','aria-hidden':true},checked?'✓':'✧')),
-    h('div',{className:'checkin-facts'},[['累计打卡',data?.totalDays||0],['最近7天',data?.weekCount||0],['连续回应',data?.currentStreak||0]].map(([label,value])=>h('div',{key:label},h('strong',null,value,h('small',null,' 天')),h('span',null,label)))),
-    h('div',{className:'checkin-week','aria-label':'近七天打卡足迹'},(data?.week||[]).map(day=>h('div',{key:day.date,className:day.checked?'is-checked':'','aria-label':`${day.date} ${day.checked?'已打卡':'未打卡'}${day.energy?`，自评精力${day.energy}分`:''}`},h('small',null,new Intl.DateTimeFormat('zh-CN',{timeZone:'UTC',weekday:'short'}).format(new Date(day.date+'T12:00:00Z'))),h('span',null,day.checked?'✓':'·')))),
-    h('div',{className:'checkin-energy-history'},h('span',null,'我的精力 · 自评'),h('div',{'aria-label':'近七天自评精力，无记录的日期留空'},(data?.week||[]).map(day=>h('i',{key:day.date,className:day.energy?'has-value':'',style:{height:day.energy?`${day.energy*5}px`:'2px'},title:day.energy?`${day.date}：${day.energy}/5`:`${day.date}：暂无记录`})) ),h('small',null,'只记录感受，不推断因果')),
-    data&&!checked&&data.totalDays>0&&data.currentStreak===0&&h('p',{className:'checkin-return-note'},`欢迎回来。之前 ${data.totalDays} 天的努力一直都在。`),
-    h('button',{type:'button',className:'checkin-primary',disabled:!data||busy,'aria-expanded':open,onClick:()=>{setOpen(value=>!value);setSaved(false);}},checked?'查看 / 更新今天的打卡 ↗':'完成今天的打卡 ↗'),
+    h('div',{className:'checkin-heading'},
+      h('h2',null,checked?'今天已打卡':'今天的打卡'),
+      h('p',null,checked?'你可以随时回来补记今天的感受。':'给自己 30 秒，记下此刻的状态。')),
+    h('button',{type:'button',className:'checkin-primary',disabled:!data||busy,'aria-expanded':open,onClick:()=>{setOpen(value=>!value);setSaved(false);}},checked?'查看或更新打卡':'记录今天'),
     open&&h('form',{className:'checkin-form',onSubmit:submit},h('fieldset',{disabled:busy},h('legend',null,'此刻的精力，感觉怎么样？（可跳过）'),h('div',{className:'checkin-energy-options'},['很疲惫','有点累','一般','还不错','很充沛'].map((label,n)=>h('button',{key:n,type:'button','aria-pressed':energy===n+1,onClick:()=>setEnergy(energy===n+1?null:n+1)},h('strong',null,n+1),label)))),
       h('fieldset',{disabled:busy},h('legend',null,'今天的状态（可跳过）'),h('div',{className:'checkin-moods'},['平静','有些累','有冲动','压力较大','轻松'].map(value=>h('button',{key:value,type:'button','aria-pressed':mood===value,onClick:()=>setMood(mood===value?'':value)},value)))),
       h('label',null,'今天做过的一件小事',h('input',{value:action,disabled:busy,maxLength:180,onChange:e=>setAction(e.target.value),placeholder:'例如：下班后走了10分钟，也可以留空'})),
       h('label',null,'留给自己的话（仅自己可见）',h('textarea',{value:note,disabled:busy,maxLength:500,rows:2,onChange:e=>setNote(e.target.value),placeholder:'不必写得完整，一句话就好。'})),
       h('button',{className:'checkin-primary',type:'submit',disabled:busy},busy?'正在收好…':'收好今天的回应 ✓'),h('small',{className:'checkin-private'},'打卡只记录今天的回应，不会自动标记未破戒，也不会重置恢复统计。')),
+    h('div',{className:'checkin-facts'},[['累计打卡',data?.totalDays||0],['最近7天',data?.weekCount||0],['连续回应',data?.currentStreak||0]].map(([label,value])=>h('div',{key:label},h('strong',null,value,h('small',null,' 天')),h('span',null,label)))),
+    h('div',{className:'checkin-week','aria-label':'近七天打卡足迹'},(data?.week||[]).map(day=>h('div',{key:day.date,className:day.checked?'is-checked':'','aria-label':`${day.date} ${day.checked?'已打卡':'未打卡'}${day.energy?`，自评精力${day.energy}分`:''}`},h('small',null,new Intl.DateTimeFormat('zh-CN',{timeZone:'UTC',weekday:'short'}).format(new Date(day.date+'T12:00:00Z'))),h('span',null,day.checked?'✓':'·')))),
+    h('div',{className:'checkin-energy-history'},h('span',null,'我的精力 · 自评'),h('div',{'aria-label':'近七天自评精力，无记录的日期留空'},(data?.week||[]).map(day=>h('i',{key:day.date,className:day.energy?'has-value':'',style:{height:day.energy?`${day.energy*5}px`:'2px'},title:day.energy?`${day.date}：${day.energy}/5`:`${day.date}：暂无记录`})) ),h('small',null,'只记录感受，不推断因果')),
+    data&&!checked&&data.totalDays>0&&data.currentStreak===0&&h('p',{className:'checkin-return-note'},`欢迎回来。之前 ${data.totalDays} 天的努力一直都在。`),
     error&&h('p',{role:'alert',className:'checkin-error'},error),saved&&h('p',{role:'status',className:'checkin-saved'},'今天的打卡已保存。你的每一小步，都值得被看见。'),
     checked&&h('div',{className:'checkin-next-steps'},h('span',null,'打卡之后，选一件就好'),h('button',{type:'button',onClick:()=>onAction('lessons')},daily?.lesson?.completedAt?'回顾今天的小课 ↗':'读一节为我准备的小课 ↗'),h('button',{type:'button',onClick:()=>onAction('melius')},'让 Melius 陪我整理一下 ↗'),
-      data.entry.action&&h(CommunityShareButton,{content:{kind:'experience',provenance:'personal',title:'今天的一小步',body:data.entry.action},label:'只分享这件小事 ↗'}))));
+      data.entry.action&&h(CommunityShareButton,{content:{kind:'experience',provenance:'personal',title:'今天的一小步',body:data.entry.action},label:'只分享这件小事 ↗'}))),
+    h(GrowthGarden, { totalDays: data?.totalDays, accountId: window.QUITTR_ACCOUNT?.user?.id }));
 }
 function CheckinReturnButton({label='回到首页，记录今天的一小步 ↗'}){return h('button',{className:'checkin-return-button',type:'button',onClick:()=>window.dispatchEvent(new CustomEvent('quittr-navigate-checkin'))},label);}
