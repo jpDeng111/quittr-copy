@@ -29,7 +29,7 @@ const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
 const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN ? new URL(process.env.PUBLIC_ORIGIN).origin : "";
 const store = createStore(path.join(DATA_DIR, "quittr.sqlite"));
-const auth = createAuth(store, { secure: PUBLIC_ORIGIN.startsWith("https://"), allowRegistration: process.env.ALLOW_REGISTRATION !== "false" });
+const auth = createAuth(store, { origin: PUBLIC_ORIGIN, secure: PUBLIC_ORIGIN.startsWith("https://"), allowRegistration: process.env.ALLOW_REGISTRATION !== "false" });
 const narrateLesson = createLessonNarrator();
 const community = createCommunity(store.db, { moderatorEmails: String(process.env.COMMUNITY_MODERATOR_EMAILS || "").split(",") });
 function requestServices() {
@@ -73,6 +73,18 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/healthz") {
       store.db.prepare("SELECT 1").get();
       return sendJson(res, 200, { status: "ok" });
+    }
+    const callback = /^\/auth\/callback\/(apple|google)$/.exec(url.pathname);
+    if (callback) {
+      const provider = callback[1];
+      if (req.method !== (provider === "apple" ? "POST" : "GET")) return sendJson(res, 405, { error: "Method Not Allowed" });
+      if (provider === "apple" && !String(req.headers["content-type"] || "").startsWith("application/x-www-form-urlencoded")) {
+        throw failure(415, "登录回调格式无效。");
+      }
+      const params = provider === "apple" ? new URLSearchParams(await readBody(req, 16384)) : url.searchParams;
+      const redirect = await auth.callback(provider, params);
+      res.writeHead(303, { Location: redirect, "Referrer-Policy": "no-referrer" });
+      return res.end();
     }
     if (url.pathname.startsWith("/api/auth/")) {
       const action = url.pathname.slice("/api/auth/".length);
@@ -129,6 +141,7 @@ async function handleRequest(req, res) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const mobileAssets = {
       '/mobile.css': ['mobile.css', 'text/css; charset=utf-8'],
+      '/mobile-auth.css': ['mobile-auth.css', 'text/css; charset=utf-8'],
       '/mobile.js': ['mobile.js', 'application/javascript; charset=utf-8'],
       '/sw.js': ['sw.js', 'application/javascript; charset=utf-8'],
       '/offline.html': ['offline.html', 'text/html; charset=utf-8'],
@@ -833,8 +846,7 @@ function setCorsHeaders(res) {
   res.setHeader("Vary", "Origin");
 }
 
-function readJson(req, maxBytes = 128 * 1024) {
-  if (req.jsonBody !== undefined) return Promise.resolve(req.jsonBody);
+function readBody(req, maxBytes) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let bytes = 0;
@@ -843,18 +855,21 @@ function readJson(req, maxBytes = 128 * 1024) {
       if (bytes > maxBytes) { reject(failure(413, "请求内容过大。")); return; }
       chunks.push(chunk);
     });
-    req.on("end", () => {
-      try {
-        const raw = Buffer.concat(chunks).toString("utf8");
-        const body = raw ? JSON.parse(raw) : {};
-        if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Invalid object");
-        resolve(body);
-      } catch (error) {
-        reject(failure(400, "请求 JSON 格式无效。"));
-      }
-    });
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
     req.on("error", reject);
   });
+}
+
+async function readJson(req, maxBytes = 128 * 1024) {
+  if (req.jsonBody !== undefined) return req.jsonBody;
+  const raw = await readBody(req, maxBytes);
+  try {
+    const body = raw ? JSON.parse(raw) : {};
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Invalid object");
+    return body;
+  } catch {
+    throw failure(400, "请求 JSON 格式无效。");
+  }
 }
 
 function loadEnvFile(filePath) {

@@ -1,6 +1,7 @@
 import SwiftUI
 import WebKit
 import UIKit
+import AuthenticationServices
 
 struct SharedFile: Identifiable { let id = UUID(); let url: URL }
 
@@ -8,12 +9,17 @@ final class WeakBridge: NSObject, WKScriptMessageHandler {
     weak var owner: QuittrWebModel?
     init(_ owner: QuittrWebModel) { self.owner = owner }
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.frameInfo.isMainFrame, message.body as? String == "settings" else { return }
-        owner?.showSettings = true
+        guard message.frameInfo.isMainFrame, let owner,
+              let url = message.frameInfo.request.url, owner.isTrustedOrigin(url) else { return }
+        if message.body as? String == "settings" { owner.showSettings = true }
+        if let command = message.body as? [String: String], command["action"] == "oauth",
+           let address = command["url"], let providerURL = URL(string: address) {
+            owner.beginProviderSignIn(providerURL)
+        }
     }
 }
 
-final class QuittrWebModel: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate {
+final class QuittrWebModel: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate, ASWebAuthenticationPresentationContextProviding {
     @Published var server: URL?
     @Published var error: String?
     @Published var loading = false
@@ -22,6 +28,8 @@ final class QuittrWebModel: NSObject, ObservableObject, WKNavigationDelegate, WK
     let webView: WKWebView
     private var downloads: [ObjectIdentifier: URL] = [:]
     private var lastSharedURL: URL?
+    private var authentication: ASWebAuthenticationSession?
+    private static let callbackScheme = "com.quittr.selfhosted.auth"
 
     override init() {
         let config = WKWebViewConfiguration()
@@ -66,6 +74,7 @@ final class QuittrWebModel: NSObject, ObservableObject, WKNavigationDelegate, WK
 
     func configure(_ url: URL, completion: @escaping () -> Void) {
         if server == url { reload(); completion(); return }
+        authentication?.cancel()
         webView.stopLoading()
         webView.configuration.websiteDataStore.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast) { [weak self] in
             DispatchQueue.main.async {
@@ -85,6 +94,49 @@ final class QuittrWebModel: NSObject, ObservableObject, WKNavigationDelegate, WK
         guard let server else { return false }
         let port: (URL) -> Int = { $0.port ?? ($0.scheme == "https" ? 443 : 80) }
         return url.scheme == server.scheme && url.host == server.host && port(url) == port(server)
+    }
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        webView.window ?? ASPresentationAnchor()
+    }
+    func beginProviderSignIn(_ url: URL) {
+        let allowed = (url.host == "accounts.google.com" && url.path == "/o/oauth2/v2/auth")
+            || (url.host == "appleid.apple.com" && url.path == "/auth/authorize")
+        guard authentication == nil, allowed, url.scheme == "https",
+              url.port == nil, url.user == nil, url.password == nil, webView.window != nil else {
+            reportSignIn(ticket: nil, message: "无法打开登录窗口，请重试。")
+            return
+        }
+        let session = ASWebAuthenticationSession(url: url, callbackURLScheme: Self.callbackScheme) { [weak self] callback, error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.authentication = nil
+                if (error as? ASWebAuthenticationSessionError)?.code == .canceledLogin {
+                    self.reportSignIn(ticket: nil, message: "")
+                    return
+                }
+                let items = callback.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }?.queryItems
+                guard callback?.scheme == Self.callbackScheme, callback?.host == "complete",
+                      let ticket = items?.first(where: { $0.name == "ticket" })?.value,
+                      ticket.range(of: "^[A-Za-z0-9_-]{43}$", options: .regularExpression) != nil else {
+                    self.reportSignIn(ticket: nil, message: "授权未完成，请重试。")
+                    return
+                }
+                self.reportSignIn(ticket: ticket, message: "")
+            }
+        }
+        session.presentationContextProvider = self
+        authentication = session
+        if !session.start() {
+            authentication = nil
+            reportSignIn(ticket: nil, message: "无法打开登录窗口，请重试。")
+        }
+    }
+    private func reportSignIn(ticket: String?, message: String) {
+        Task { @MainActor in
+            _ = try? await webView.callAsyncJavaScript("window.quittrNativeAuthResult?.(ticket, message)", arguments: [
+                "ticket": ticket ?? "", "message": message
+            ], in: nil, contentWorld: .page)
+        }
     }
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = action.request.url else { decisionHandler(.cancel); return }

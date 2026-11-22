@@ -1,9 +1,14 @@
 const crypto = require('node:crypto');
 const { promisify } = require('node:util');
 const { failure } = require('./storage');
+const { createLoginProviders } = require('./login-providers');
+const { createIdentityAuth } = require('./identity-auth');
 const scrypt = promisify(crypto.scrypt);
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
-const publicUser = user => ({ id: user.id, email: user.email, createdAt: user.created_at });
+const publicUser = user => ({
+  id: user.id, email: user.email.includes('@') ? user.email : null,
+  hasPassword: !!user.password_hash, createdAt: user.created_at
+});
 const emailOf = value => String(value || '').trim().toLowerCase();
 
 async function hashPassword(password) {
@@ -19,7 +24,7 @@ async function verifyPassword(password, encoded) {
 function validatePassword(password) {
   if (typeof password !== 'string' || password.length < 12 || password.length > 128) throw failure(400, '请使用 12–128 位密码。');
 }
-function createAuth(store, { secure = false, allowRegistration = true } = {}) {
+function createAuth(store, { secure = false, allowRegistration = true, origin = '', providers = createLoginProviders({ origin }) } = {}) {
   const { db } = store;
   const cookieName = secure ? '__Host-quittr-session' : 'quittr-session';
   // Same cost on unknown accounts, so login does not cheaply reveal registrations.
@@ -50,11 +55,26 @@ function createAuth(store, { secure = false, allowRegistration = true } = {}) {
     db.prepare(`INSERT INTO auth_attempts VALUES (?, 1, ?) ON CONFLICT(key) DO UPDATE SET count=count+1`).run(key, now + minutes * 60000);
     if (db.prepare('SELECT count FROM auth_attempts WHERE key=?').get(key).count > maximum) throw failure(429, '尝试过于频繁，请稍后重试。');
   }
+  function signIn(req, res, user, linking = false) {
+    if (!linking) {
+      db.prepare('DELETE FROM sessions WHERE token_hash=?').run(digest(tokenOf(req)));
+      issue(user, res);
+    }
+    return { user: publicUser(user), methods: identities.methods(user.id) };
+  }
+  const identities = createIdentityAuth(db, { providers, origin, session, limit, allowRegistration, signIn });
   async function handle(action, req, res, body = {}) {
     if (action === 'session') {
-      try { return { user: publicUser(session(req)), registrationOpen: allowRegistration }; }
-      catch (error) { if (error.status === 401) return { user: null, registrationOpen: allowRegistration }; throw error; }
+      const options = { registrationOpen: allowRegistration, providers: identities.availability };
+      try {
+        const user = session(req);
+        return { ...options, user: publicUser(user), methods: identities.methods(user.id) };
+      } catch (error) {
+        if (error.status === 401) return { ...options, user: null, methods: [] };
+        throw error;
+      }
     }
+    if (['oauth/start', 'oauth/finish', 'sms/start', 'sms/verify'].includes(action)) return identities.handle(action, req, res, body);
     const email = emailOf(body.email);
     if (['login', 'register', 'password'].includes(action)) limit(`ip:${req.clientIp || req.socket.remoteAddress}`, 30, 15);
     if (['login', 'register'].includes(action)) {
@@ -74,12 +94,11 @@ function createAuth(store, { secure = false, allowRegistration = true } = {}) {
       if (typeof body.password !== 'string' || body.password.length > 128) throw failure(400, '邮箱或密码不正确。');
       const user = db.prepare('SELECT * FROM users WHERE email=?').get(email);
       const valid = await verifyPassword(body.password, user?.password_hash || dummyHash);
-      if (!user || !valid) throw failure(401, '邮箱或密码不正确。');
+      if (!user?.password_hash || !valid) throw failure(401, '邮箱或密码不正确。');
       if (db.prepare('SELECT password_hash FROM users WHERE id=?').get(user.id)?.password_hash !== user.password_hash) throw failure(401, '密码已变更，请重新登录。');
       db.prepare('DELETE FROM auth_attempts WHERE key=?').run(`account:${digest(email)}`);
       // Replace this browser's previous session on successful login.
-      db.prepare('DELETE FROM sessions WHERE token_hash=?').run(digest(tokenOf(req)));
-      issue(user, res); return { user: publicUser(user) };
+      return signIn(req, res, user);
     }
     if (action === 'logout') {
       db.prepare('DELETE FROM sessions WHERE token_hash=?').run(digest(tokenOf(req)));
@@ -88,7 +107,7 @@ function createAuth(store, { secure = false, allowRegistration = true } = {}) {
     if (action === 'password') {
       const user = session(req);
       validatePassword(body.password);
-      if (typeof body.currentPassword !== 'string' || body.currentPassword.length > 128 || !await verifyPassword(body.currentPassword, user.password_hash)) throw failure(401, '当前密码不正确。');
+      if (!user.password_hash || typeof body.currentPassword !== 'string' || body.currentPassword.length > 128 || !await verifyPassword(body.currentPassword, user.password_hash)) throw failure(401, '当前密码不正确。');
       const hash = await hashPassword(body.password);
       if (db.prepare('SELECT password_hash FROM users WHERE id=?').get(user.id)?.password_hash !== user.password_hash) throw failure(401, '密码已变更，请重新登录。');
       // Password changes invalidate all old sessions, including other devices.
@@ -102,6 +121,6 @@ function createAuth(store, { secure = false, allowRegistration = true } = {}) {
     }
     throw failure(404, '接口不存在。');
   }
-  return { session, handle, limitUser: (userId, action, maximum, minutes) => limit(`user:${userId}:${action}`, maximum, minutes) };
+  return { session, handle, callback: identities.callback, limitUser: (userId, action, maximum, minutes) => limit(`user:${userId}:${action}`, maximum, minutes) };
 }
 module.exports = { createAuth, publicUser, hashPassword, validatePassword };

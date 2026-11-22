@@ -12,6 +12,16 @@ SwiftUI + WKWebView 客户端，连接这台 Mac 已运行的 Quittr 服务，�
 
 服务器地址可在登录页或「我的账号 → 服务器连接设置」修改。切换服务器会清除这个 App 中的原登录和网页缓存，服务器端数据保留。
 
+## 移动端登录
+
+登录页提供 Apple、Google 和手机验证码。Apple 与 Google 在系统认证窗口打开。已有邮箱账号可以用登录页的「已有邮箱账号？」进入原账号，然后在「我的账号 → 登录方式」绑定，保留原账号的记录。
+
+- Apple 使用关联了 Sign in with Apple 的 Services ID 和有效的 client secret JWT。回调地址为 `PUBLIC_ORIGIN/auth/callback/apple`，在 Apple Developer 控制台登记该 HTTPS 地址。
+- Google 使用 Web application OAuth client。回调地址为 `PUBLIC_ORIGIN/auth/callback/google`，在 Google Cloud 控制台登记该 HTTPS 地址。
+- 手机验证码使用 Twilio Verify SMS。填写 `.env.example` 中对应的三个配置项，在 Verify 控制台开通目标地区，使用实际运营商号码完成验收。
+
+重新启动 Quittr 服务后，已配置的登录方式会自动启用。iOS App 需要包含系统认证桥接的新构建。生产环境通过 HTTPS 提供登录服务。
+
 ## 网络和数据
 
 - 使用 WebKit 的持久化 Cookie 数据库；不把密码或会话 Token 复制到 UserDefaults。UserDefaults 只保存服务器根地址。

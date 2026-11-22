@@ -1,0 +1,71 @@
+.mobile-auth {
+  min-height: 100svh;
+  max-width: 480px;
+  margin: auto;
+  padding: max(40px, calc(env(safe-area-inset-top) + 20px)) 22px max(26px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 36px;
+}
+.mobile-auth-heading { padding: 0 4px; }
+.mobile-auth-brand { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 800; }
+.mobile-auth-brand img { width: 44px; height: 44px; border-radius: 12px; }
+.mobile-auth-heading h1 { font-size: clamp(32px, 8vw, 42px); margin: 21px 0 10px; line-height: 1.15; }
+.mobile-auth-heading p { margin: 0; color: #aebdb5; font-size: 14px; line-height: 1.6; }
+.mobile-auth-card {
+  border: 1px solid #bfe8d027;
+  border-radius: 27px;
+  background: linear-gradient(154deg, #202d27, #141b18 85%);
+  box-shadow: 0 25px 60px #0005;
+  padding: 24px 18px 18px;
+}
+.mobile-auth-card h2 { font-size: 19px; margin: 0 6px 17px; }
+.login-methods { min-width: 0; }
+.auth-card > .login-methods, .account-section > .login-methods { margin-top: 18px; }
+.login-method-buttons { display: grid; gap: 10px; }
+.login-method {
+  min-height: 54px;
+  padding: 11px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #111b16;
+  color: #e4f4e9;
+  text-align: left;
+  border: 1px solid #bfe8d046;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.login-method-apple:not(:disabled) { background: #f5f7f5; border-color: #f5f7f5; color: #0a110d; }
+.login-method-sms:not(:disabled) { background: #284537; border-color: #8dbc9d75; }
+.login-method:disabled { cursor: default; color: #c8d5ce; }
+.login-method small { color: #b3c3b9; font-size: 11px; font-weight: 600; }
+.login-method:focus-visible, .login-phone input:focus-visible { outline: 2px solid #a3e6ba; outline-offset: 2px; }
+.mobile-auth-legacy { margin: 14px 6px 0; }
+.mobile-auth-card > .auth-error, .login-methods > .auth-error { margin: 12px 4px 0; }
+.login-phone { display: grid; gap: 12px; margin: 0; }
+.login-phone p { margin: 0; overflow-wrap: anywhere; color: #b3c3b9; font-size: 14px; }
+.login-phone label { display: grid; gap: 8px; color: #d5e3da; font-size: 13px; }
+.login-phone input {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px;
+  border: 1px solid #bfe8d046;
+  border-radius: 11px;
+  background: #0c1510;
+  color: #f5fbf7;
+  font: inherit;
+  font-size: 16px;
+}
+.login-phone > .auth-link { margin: 0; padding: 8px 0; justify-self: start; }
+.auth-redirect-notice {
+  position: fixed; top: max(20px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+  z-index: 100; width: min(420px, 90vw); padding: 12px 16px;
+  border: 1px solid #bfe8d046; border-radius: 10px; background: #1f2c25; color: #f1f9f3;
+}
+.auth-redirect-notice button { float: right; background: none; border: 0; color: inherit; font-size: 18px; }
