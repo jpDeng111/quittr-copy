@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const { createMeliusService } = require("./melius");
 const { createCheckinService } = require("./checkins");
 const { createPlanService } = require("./plans");
+const { createLessonNarrator } = require("./lesson-narration");
 const { createLessonService } = require("./lessons");
 const { readCompletionStream } = require("./public/event-stream");
 const { createStore, current, failure, chatHistory } = require("./storage");
@@ -29,6 +30,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN ? new URL(process.env.PUBLIC_ORIGIN).origin : "";
 const store = createStore(path.join(DATA_DIR, "quittr.sqlite"));
 const auth = createAuth(store, { secure: PUBLIC_ORIGIN.startsWith("https://"), allowRegistration: process.env.ALLOW_REGISTRATION !== "false" });
+const narrateLesson = createLessonNarrator();
 const community = createCommunity(store.db, { moderatorEmails: String(process.env.COMMUNITY_MODERATOR_EMAILS || "").split(",") });
 function requestServices() {
   const context = current();
@@ -80,6 +82,15 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith("/api/")) {
       const user = auth.session(req);
       if (req.headers["x-quittr-account"] && req.headers["x-quittr-account"] !== user.id) throw failure(401, "账号已切换，请重新登录后操作。");
+      if (req.method === "GET" && url.pathname === "/api/lessons/film-audio") {
+        const lesson = await store.run(user, () => lessons.get(url.searchParams.get("timeZone") || "Asia/Shanghai").lesson);
+        if (lesson.id !== url.searchParams.get("id") || lesson.origin !== url.searchParams.get("origin")) {
+          throw failure(404, "课程已更新，请刷新小课堂。");
+        }
+        // Speech synthesis does not need to hold the per-account state lock.
+        const audio = await narrateLesson(lesson, user.id);
+        return sendLessonAudio(req, res, audio);
+      }
       if (req.method === "POST") {
         auth.limitUser(user.id, "writes", 120, 1);
         if (url.pathname === "/api/melius/chat") auth.limitUser(user.id, "chat", 12, 1);
@@ -94,6 +105,24 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, error.status || 500, { error: error.status ? error.message : "服务器暂时无法完成请求，请稍后重试。" });
   }
 });
+
+function sendLessonAudio(req, res, audio) {
+  res.setHeader("Content-Type", "audio/wav");
+  res.setHeader("Accept-Ranges", "bytes");
+  if (!req.headers.range) {
+    res.setHeader("Content-Length", audio.length);
+    return res.end(audio);
+  }
+  const match = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range);
+  const start = match?.[1] ? Number(match[1]) : Math.max(0, audio.length - Number(match?.[2]));
+  const end = match?.[1] && match[2] ? Math.min(audio.length - 1, Number(match[2])) : audio.length - 1;
+  if (!match || !Number.isSafeInteger(start) || start < 0 || start > end || start >= audio.length) {
+    res.writeHead(416, { "Content-Range": `bytes */${audio.length}` });
+    return res.end();
+  }
+  res.writeHead(206, { "Content-Range": `bytes ${start}-${end}/${audio.length}`, "Content-Length": end - start + 1 });
+  return res.end(audio.subarray(start, end + 1));
+}
 
 async function handleRequest(req, res) {
   try {

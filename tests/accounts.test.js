@@ -83,7 +83,7 @@ test('HTTP registration, account isolation, chat history, restart and session re
   t.after(async () => { await stop(); fs.rmSync(dir, { recursive: true }); });
   for (const route of ['/mobile.css', '/mobile.js', '/manifest.webmanifest', '/sw.js', '/offline.html', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png']) assert.equal((await request(route)).status, 200);
   assert.equal((await request('/manifest.webmanifest')).data.display, 'standalone');
-  for (const route of ['/api/quittr/journal', '/api/melius/history', '/api/quittr/analytics', '/api/account/export', '/api/blocker/state', '/api/community/posts', '/api/lessons/daily', '/api/plans', '/api/checkins']) assert.equal((await request(route)).status, 401);
+  for (const route of ['/api/quittr/journal', '/api/melius/history', '/api/quittr/analytics', '/api/account/export', '/api/blocker/state', '/api/community/posts', '/api/lessons/daily', '/api/lessons/film-audio', '/api/plans', '/api/checkins']) assert.equal((await request(route)).status, 401);
   assert.equal((await request('/api/auth/register', { body: {}, headers: { Origin: 'https://evil.example' } })).status, 403);
   assert.equal((await request('/api/auth/register', { raw: '{bad' })).status, 400);
   assert.equal((await request('/api/auth/register', { raw: JSON.stringify({ value: 'a'.repeat(150000) }) })).status, 413);
@@ -94,6 +94,7 @@ test('HTTP registration, account isolation, chat history, restart and session re
   assert.equal(a.data.user.email, 'a@example.com');
   assert.match(a.response.headers.get('set-cookie'), /HttpOnly; SameSite=Lax/);
   assert.notEqual(a.cookie, b.cookie);
+  assert.equal((await request('/api/lessons/film-audio?id=unavailable&origin=ai', { cookie: b.cookie })).status, 404);
   assert.ok(!JSON.stringify(a.data).includes('password_hash'));
   const rows = app.store.db.prepare('SELECT password_hash FROM users').all();
   assert.ok(rows.every(row => !row.password_hash.includes(password) && row.password_hash.startsWith('scrypt:')));

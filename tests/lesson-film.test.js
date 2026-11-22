@@ -44,3 +44,17 @@ test('film composition renders legacy decks and escapes model-authored text', ()
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.doesNotMatch(html, /<script|<img/);
 });
+
+test('narration cache is private to each account and deduplicates media range requests', async () => {
+  const { createLessonNarrator } = require('../lesson-narration');
+  let calls = 0;
+  const narrate = createLessonNarrator({ platform: 'darwin', render: async cues => {
+    assert.match(cues[0].narration, /色情内容/);
+    return Buffer.from(String(++calls));
+  } });
+  const lesson = starter();
+  const [first, replay] = await Promise.all([narrate(lesson, 'a'), narrate(lesson, 'a')]);
+  assert.equal(replay, first);
+  assert.notEqual(await narrate(lesson, 'b'), first);
+  assert.equal(calls, 2);
+});

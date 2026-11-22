@@ -34,7 +34,9 @@
     let offset = 0;
     for (const scene of scenes) {
       scene.start = offset;
-      scene.duration = Math.max(5, Math.min(13, Math.ceil((Array.from(scene.title + scene.caption + scene.steps.join('')).length) / 11) + 1));
+      const title = /[。！？!?]$/.test(scene.title) ? scene.title : scene.title.replace(/[，、；：]$/, '') + '。';
+      scene.narration = [title, scene.caption].filter(Boolean).join(' ');
+      scene.duration = Math.max(6, Math.ceil(Array.from(scene.narration).length / 7) + 2);
       scene.label = labels[scene.kind];
       offset += scene.duration;
     }
@@ -122,41 +124,66 @@ function DailyLessonFilm({ lesson, onRead, children }) {
   });
   const { film } = session;
   const timelineRef = useRef(null);
+  const audioRef = useRef(null);
+  const transport = useRef({ mode: 'paused', request: 0 });
   const mountRef = useRef(null);
   const timeRef = useRef(0);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [buffering, setBuffering] = useState(false);
+  const [sound, setSound] = useState(true);
+  const [voiceError, setVoiceError] = useState(false);
   const [ready, setReady] = useState(false);
   const current = film.scenes.findLastIndex(scene => time >= scene.start);
   const ended = time >= film.duration;
+  const audioURL = '/api/lessons/film-audio?' + new URLSearchParams({
+    id: lesson.id, origin: lesson.origin, timeZone: lesson.timeZone
+  });
+
+  function pause() {
+    transport.current.request++;
+    transport.current.mode = 'paused';
+    audioRef.current?.pause();
+    timelineRef.current?.pause();
+    setPlaying(false);
+    setBuffering(false);
+  }
 
   useEffect(() => {
     const stage = mountRef.current.querySelector('.lesson-film-stage');
     if (!window.gsap || !stage) return;
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
     const timeline = QuittrLessonFilm.createTimeline(stage, window.gsap, { reducedMotion: media.matches });
-    const syncClock = () => {
-      const next = Math.floor(timeline.time() * 10) / 10;
+    const audio = audioRef.current;
+    const reportTime = value => {
+      const next = Math.floor(value * 10) / 10;
       if (next !== timeRef.current) {
         timeRef.current = next;
         setTime(next);
       }
     };
-    timeline.eventCallback('onUpdate', syncClock);
+    const syncAudio = () => {
+      if (transport.current.mode !== 'audio' || audio.paused) return;
+      timeline.seek(Math.min(audio.currentTime, film.duration));
+      reportTime(timeline.time());
+    };
+    timeline.eventCallback('onUpdate', () => reportTime(timeline.time()));
     timeline.eventCallback('onComplete', () => {
+      timeRef.current = film.duration;
       setTime(film.duration);
-      setPlaying(false);
+      pause();
     });
     timelineRef.current = timeline;
-    const pauseIfHidden = () => {
-      if (!document.hidden) return;
-      timeline.pause();
-      setPlaying(false);
-    };
+    window.gsap.ticker.add(syncAudio);
+    const pauseIfHidden = () => { if (document.hidden) pause(); };
     document.addEventListener('visibilitychange', pauseIfHidden);
     setReady(true);
     return () => {
       document.removeEventListener('visibilitychange', pauseIfHidden);
+      transport.current.request++;
+      transport.current.mode = 'paused';
+      audio.pause();
+      window.gsap.ticker.remove(syncAudio);
       timeline.kill();
       timelineRef.current = null;
     };
@@ -164,37 +191,78 @@ function DailyLessonFilm({ lesson, onRead, children }) {
 
   function seek(next) {
     timelineRef.current?.seek(next);
+    if (transport.current.mode === 'audio') audioRef.current.currentTime = next;
     timeRef.current = next;
     setTime(next);
-    if (next >= film.duration) {
-      timelineRef.current?.pause();
-      setPlaying(false);
+    if (next >= film.duration) pause();
+  }
+
+  function useCaptions() {
+    if (transport.current.mode !== 'audio') return;
+    transport.current.mode = 'silent';
+    setVoiceError(true);
+    setBuffering(false);
+    timelineRef.current?.play();
+  }
+
+  async function play(withSound) {
+    const timeline = timelineRef.current;
+    if (!timeline) return;
+    if (timeRef.current >= film.duration) seek(0);
+    setPlaying(true);
+    if (!withSound) {
+      transport.current.mode = 'silent';
+      timeline.play();
+      return;
+    }
+    timeline.pause();
+    const audio = audioRef.current;
+    const request = ++transport.current.request;
+    transport.current.mode = 'audio';
+    setBuffering(true);
+    try {
+      audio.currentTime = timeRef.current;
+      await audio.play();
+      if (transport.current.request === request) setBuffering(false);
+    } catch {
+      if (transport.current.request === request) useCaptions();
     }
   }
 
-  function toggle() {
-    const timeline = timelineRef.current;
-    if (!timeline) return;
-    if (playing) timeline.pause();
-    else {
-      if (ended) seek(0);
-      timeline.play();
+  function toggleSound() {
+    const enabled = !sound || voiceError;
+    setSound(enabled);
+    if (voiceError) {
+      setVoiceError(false);
+      audioRef.current.load();
     }
-    setPlaying(!playing);
+    if (playing) {
+      pause();
+      play(enabled);
+    }
   }
 
   const formatTime = value => Math.floor(value / 60) + ':' + String(Math.floor(value % 60)).padStart(2, '0');
   return h('section', { className: 'lesson-film', 'aria-label': '今日戒色课堂动画' },
     h('header', { className: 'film-player-heading' },
-      h('div', null, h('h2', null, '今日课堂动画'), h('p', null, '字幕短片 · ', lesson.origin === 'ai' && lesson.hasActivity ? '根据近期记录生成' : '戒色入门')),
+      h('div', null, h('h2', null, '今日课堂动画'), h('p', null, '中文旁白和字幕 · ', lesson.origin === 'ai' && lesson.hasActivity ? '根据近期记录生成' : '戒色入门')),
       h('button', { type: 'button', className: 'film-read-link', onClick: () => onRead(lesson) }, '读卡片 ↗')),
     h('div', { className: 'film-screen', ref: mountRef },
       h('div', { className: 'film-composition', dangerouslySetInnerHTML: session.markup })),
+    h('audio', { ref: audioRef, src: audioURL, preload: 'none', onError: useCaptions,
+      onPause: () => {
+        if (transport.current.mode === 'audio' && audioRef.current.paused && !audioRef.current.ended) pause();
+      },
+      onEnded: () => { if (transport.current.mode === 'audio') seek(film.duration); } }),
     h('div', { className: 'film-controls' },
-      h('button', { type: 'button', className: 'film-play', onClick: toggle, disabled: !ready, 'aria-label': playing ? '暂停动画' : ended ? '重播动画' : '播放动画' },
+      h('button', { type: 'button', className: 'film-play', onClick: () => playing ? pause() : play(sound && !voiceError), disabled: !ready, 'aria-label': playing ? '暂停动画' : ended ? '重播动画' : '播放动画' },
         h('span', { 'aria-hidden': true }, playing ? 'Ⅱ' : ended ? '↻' : '▶'), h('span', null, playing ? '暂停' : ended ? '重播' : '播放')),
       h('input', { type: 'range', min: 0, max: film.duration, step: 0.1, value: time, disabled: !ready, onChange: event => seek(Number(event.target.value)), 'aria-label': '动画播放进度', 'aria-valuetext': formatTime(time) + ' / ' + formatTime(film.duration) }),
-      h('output', { 'aria-hidden': true }, formatTime(time), ' / ', formatTime(film.duration))),
+      h('output', { 'aria-hidden': true }, formatTime(time), ' / ', formatTime(film.duration)),
+      h('button', { type: 'button', className: 'film-sound', onClick: toggleSound, 'aria-pressed': sound && !voiceError },
+        voiceError ? '重试旁白' : sound ? '旁白开' : '旁白关')),
+    buffering && h('p', { className: 'film-audio-status', role: 'status' }, '正在准备中文旁白…'),
+    voiceError && h('p', { className: 'film-audio-status', role: 'status' }, '旁白暂时无法播放，字幕仍可观看。'),
     h('nav', { className: 'film-chapters', 'aria-label': '动画分镜' },
       film.scenes.map((scene, index) => h('button', { key: scene.kind, type: 'button', disabled: !ready, onClick: () => seek(scene.start + Math.min(1.6, scene.duration / 2)), 'aria-current': index === current ? 'step' : undefined }, scene.label))),
     h('details', { className: 'film-transcript' }, h('summary', null, '查看动画字幕'),

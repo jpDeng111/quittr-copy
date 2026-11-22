@@ -133,3 +133,7 @@
   .film-motif { grid-row: 2; align-self: end; justify-self: end; width: 20%; }
   .film-takeaway { grid-row: 3; padding-top: 1.8cqw; }
 }
+
+.film-sound { flex: none; border: 1px solid #9aaf9061; border-radius: 7px; padding: 7px 9px; background: #232b23; color: #d8e5cc; font-size: 12px; cursor: pointer; }
+.film-sound[aria-pressed="true"] { background: #3b4a33; }
+.film-audio-status { color: #d8e5cc; font-size: 12px; margin: 10px 0 0; }
