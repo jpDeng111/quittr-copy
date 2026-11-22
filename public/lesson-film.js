@@ -36,7 +36,7 @@
       scene.start = offset;
       const title = /[。！？!?]$/.test(scene.title) ? scene.title : scene.title.replace(/[，、；：]$/, '') + '。';
       scene.narration = [title, scene.caption].filter(Boolean).join(' ');
-      scene.duration = Math.max(6, Math.ceil(Array.from(scene.narration).length / 7) + 2);
+      scene.duration = Math.max(6, Math.ceil(Array.from(scene.narration).length / 4.5) + 2);
       scene.label = labels[scene.kind];
       offset += scene.duration;
     }

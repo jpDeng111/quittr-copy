@@ -58,3 +58,59 @@ test('narration cache is private to each account and deduplicates media range re
   assert.notEqual(await narrate(lesson, 'b'), first);
   assert.equal(calls, 2);
 });
+
+test('Omni Flash Realtime streams Tina narration, retries changed wording, and fits each scene', async () => {
+  const { createLessonNarrator } = require('../lesson-narration');
+  const lesson = starter();
+  const film = buildFilm(lesson);
+  const sampleRate = 24000;
+  const clip = Buffer.alloc(film.scenes[0].duration * sampleRate * 2, 1);
+  const attempts = new Map();
+  const narrate = createLessonNarrator({
+    platform: 'linux',
+    apiKey: 'test-key',
+    workspace: 'test-workspace',
+    voice: 'Tina',
+    connect: (url, options) => {
+      assert.equal(url, 'wss://test-workspace.cn-beijing.maas.aliyuncs.com/api-ws/v1/realtime?model=qwen3.8-omni-flash-realtime');
+      assert.equal(options.headers.Authorization, 'Bearer test-key');
+      const socket = new EventTarget();
+      const emit = (type, fields = {}) => socket.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type, ...fields }) }));
+      let text;
+      socket.close = () => socket.dispatchEvent(new Event('close'));
+      socket.send = payload => {
+        const message = JSON.parse(payload);
+        if (message.type === 'session.update') {
+          assert.equal(message.session.audio.output.voice, 'Tina');
+          assert.equal(message.session.audio.output.format.sample_rate, sampleRate);
+          assert.equal(message.session.turn_detection, null);
+          queueMicrotask(() => emit('session.updated'));
+        } else if (message.type === 'conversation.item.create') {
+          const input = message.item.content[0].text;
+          text = film.scenes.find(scene => input.endsWith('「' + scene.narration + '」'))?.narration;
+          assert.ok(text);
+          attempts.set(text, (attempts.get(text) || 0) + 1);
+        } else if (message.type === 'response.create') {
+          const changed = text === film.scenes[0].narration && attempts.get(text) === 1;
+          queueMicrotask(() => {
+            emit('response.audio.delta', { delta: clip.toString('base64') });
+            emit('response.audio_transcript.done', { transcript: changed ? '额外的问候。' + text : text + '。' });
+            emit('response.done', { response: { status: 'completed' } });
+          });
+        }
+      };
+      queueMicrotask(() => emit('session.created'));
+      return socket;
+    }
+  });
+  const audio = await narrate(lesson, 'test-account');
+  const sampleAt = time => audio.readInt16LE(44 + Math.round(time * sampleRate) * 2);
+  assert.equal(attempts.size, film.scenes.length);
+  assert.equal(attempts.get(film.scenes[0].narration), 2);
+  assert.equal(audio.readUInt32LE(24), sampleRate);
+  assert.equal(audio.length, 44 + film.duration * sampleRate * 2);
+  assert.equal(sampleAt(0), 0);
+  assert.equal(sampleAt(0.7), 257);
+  assert.equal(sampleAt(film.scenes[0].duration - 0.31), 257);
+  assert.equal(sampleAt(film.scenes[0].duration - 0.29), 0);
+});
