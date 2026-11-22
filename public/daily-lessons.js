@@ -216,6 +216,8 @@ function DailyClassroomPage({ daily, onOpen, onAction, chapters, activeChapterId
     tabName === 'courses' ? h('div', { className: 'classroom-curriculum', role: 'tabpanel' }, h(CourseOverviewPage, { chapters, activeChapterIdx, setActiveChapterIdx, onAction })) :
     h('div', { role: 'tabpanel' },
       h('div', { className: 'classroom-section-label' }, h('span', null, h('i'), 'TODAY’S LITTLE DISCOVERY'), h('span', null, dateLabel)),
+      lesson && !daily.generating && h(DailyLessonFilm, { key: lesson.id + ':' + lesson.origin, lesson, onRead: onOpen },
+        h(CheckinReturnButton, { label: '带着这个行动去打卡 ↗' })),
       !lesson ? h('div', { className: 'classroom-empty', role: 'status' }, h(LessonSpark), h('h2', null, daily.loading ? '正在整理今天的灵感…' : '小课堂暂时无法加载'), h('p', null, '一点新理解，一次小改变。'), !daily.loading && h('button', { className: 'classroom-primary', onClick: () => daily.regenerate() }, '重新加载')) :
       daily.generating || daily.draftCards?.length ? h(LessonLiveStudio, { daily, onOpen }) : h('div', { className: 'classroom-grid' },
         h('article', { className: `classroom-cover cover-${lesson.theme}` },

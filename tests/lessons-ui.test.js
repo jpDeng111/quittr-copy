@@ -12,7 +12,7 @@ function harness() {
     localStorage: { getItem() { return null; }, setItem() {} },
     useState(initial) { const i = cursor++; if (!(i in values)) values[i] = typeof initial === 'function' ? initial() : initial; return [values[i], (next) => { values[i] = typeof next === 'function' ? next(values[i]) : next; }]; },
     useRef(initial) { const i = refCursor++; if (!(i in refs)) refs[i] = { current: initial }; return refs[i]; },
-    useEffect() {}, h: (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity) }), Icon() {}, CourseOverviewPage() {}, CommunityShareButton() {}, CheckinReturnButton() {}, lessonShareContent() {}
+    useEffect() {}, h: (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity) }), Icon() {}, CourseOverviewPage() {}, DailyLessonFilm() {}, CommunityShareButton() {}, CheckinReturnButton() {}, lessonShareContent() {}
   });
   vm.runInContext(fs.readFileSync(require.resolve('../public/daily-lessons.js'), 'utf8'), ctx);
   const lesson = createLessonService({ readState: () => ({}), writeState() {}, complete() {}, now: () => new Date('2026-11-03T00:00:00Z') }).get().lesson;
@@ -140,4 +140,13 @@ test('a cached AI lesson flagged for topic-policy refresh triggers automatic gen
   assert.equal(posts,1);
   assert.equal(f.render('useDailyLessons(Date.now())').generating,false);
   cleanup();
+});
+
+test('a ready lesson shows the animation and regeneration keeps the draft reader', () => {
+  const f = harness();
+  const animation = tree => find(tree, node => node.type?.name === 'DailyLessonFilm');
+  const ready = f.render('DailyClassroomPage(props)');
+  assert.equal(animation(ready).props.lesson.id, f.lesson.id);
+  f.ctx.props.daily.generating = true;
+  assert.equal(animation(f.render('DailyClassroomPage(props)')), null);
 });

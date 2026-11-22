@@ -167,7 +167,10 @@ function parseLessonCard(card, index, base) {
     annotations.push({ text, style: ['underline', 'circle', 'highlight'].includes(item.style) ? item.style : 'underline' });
     if (annotations.length === 3) break;
   }
+  // The film caption is a short excerpt of the validated lesson body.
+  const filmCaption = clean(card.filmCaption, 110);
   const normalized = { kind: CARD_KINDS[index], label: clean(card.label, 24) || base.cards[index].label, title: clean(card.title, 52), body, highlight: clean(card.highlight, 90), steps, annotations };
+  if (filmCaption.length >= 18 && body.includes(filmCaption)) normalized.filmCaption = filmCaption;
   if (index === 0 && !RECOVERY_TOPIC.test(cardTopicText(normalized))) throw new Error('Opening card must address recovery from pornography habits');
   return normalized;
 }
@@ -231,6 +234,7 @@ function promptMessages(context, previousLesson) {
       '避免重复recentTopics中最近讲过的主题，可以在小课反馈上自然延伸。如果有previousLesson，说明用户主动要求换一课：换一个不同的教学重点（例如上一节讲识别念头，这一节就讲环境调整、替代动作或事后复盘），换一个比喻，四张卡片的标题、正文和小标题都要有明显差别，不能只改封面或换措辞。仍要基于相同的真实记录，也不能为了新鲜而虚构经历。',
       '不做诊断、不提供药物建议、不编造研究/概率/大脑恢复天数、不承诺治愈、不带羞耻或色情描写。不把“必须控制住”作为目标。肯定小进步。用“可能、可以尝试”表达推断。',
       '仅返回JSON对象，不要代码块标记或任何解释：title(20字内，可含换行), subtitle(40字内), category(8字内), theme(tide/bloom/dawn/orbit), reason(60字内、根据实际素材说明为什么推荐、不暴露私密细节), takeaway(35字内), cards(恰好5张)。',
+      '每张卡片可附 filmCaption 给课堂动画。它须是从本卡正文逐字摘取的连续短句，约 30–70 字，脱离卡片也能读懂。不增加事实，不带用户原话或可识别隐私。优先选含已标注重点的句子。第1张的字幕要明确说出戒色或色情内容；步骤和行动围绕同一个主题推进。',
       '每张卡片包含kind,label(12字内),title(20字内，可含换行),body(60-100字),highlight(30字内),steps(字符串数组),annotations(1-3个正文重点标注，包含text和style)。text必须逐字摘自body，为2-12字的短语；style从underline下划线、circle圈出、highlight荧光笔中选择，突出具体概念和可做的动作，不能标整段。JSON按封面字段在前、cards在后输出，卡片字段按kind,label,title,body,annotations,highlight,steps的顺序输出。顺序固定：insight(换个视角，steps为空)，pattern(看见触发到反应的过程，steps为3个简短节点)，practice(可在60秒内尝试的练习，steps为3个具体动作)，reflection(一个与主题相关的问题，steps为3-4个适合单选的感受/需要答案)，action(今天可以做的小行动，steps为3个可单选的行动)。'
     ].join('\n') },
     { role: 'user', content: JSON.stringify({ ...context, previousLesson }) }

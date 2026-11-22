@@ -165,6 +165,16 @@ async function handleRequest(req, res) {
       return serveFile(res, path.join(STATIC_DIR, "melius-chat.js"), "application/javascript; charset=utf-8");
     }
 
+    if (req.method === "GET" && url.pathname === "/lesson-film.css") {
+      return serveFile(res, path.join(STATIC_DIR, "lesson-film.css"), "text/css; charset=utf-8");
+    }
+    if (req.method === "GET" && url.pathname === "/lesson-film.js") {
+      return serveFile(res, path.join(STATIC_DIR, "lesson-film.js"), "application/javascript; charset=utf-8");
+    }
+    if (req.method === "GET" && url.pathname === "/vendor/gsap.js") {
+      return serveFile(res, path.join(STATIC_DIR, "vendor", "gsap.js"), "application/javascript; charset=utf-8");
+    }
+
     if (req.method === "GET" && url.pathname === "/daily-lessons.js") {
       return serveFile(res, path.join(STATIC_DIR, "daily-lessons.js"), "application/javascript; charset=utf-8");
     }
